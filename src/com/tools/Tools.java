@@ -794,24 +794,18 @@ public class Tools {
 	}
 
 	/** Show a dialog that will only be shown once at startup. 
-	 * This inputs in the calling ctx are required:
-	 * SharedPreferences mPrefs;
-	 * final String welcomeScreenShownPref = "welcomeScreenShown";
-	 * 
 	 * @param ctx The context where this dialog will be displayed
-	 * @param prefs The preferences object that must present in the calling context/activity
 	 * @param welcomeScreenShownPref The string where the preference is stored
 	 * @param title The title of the box
 	 * @param text The text in the body
 	 * @param toShow Boolean whether to show or not. Input null to read from preferences
 	 */
 	public static void showOneTimeDialog(Context ctx,
-			SharedPreferences prefs,
 			String welcomeScreenShownPref,
 			String title,
 			String text, 
 			Boolean toShow){
-		prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
 
 		// second argument is the default to use if the preference can't be found
 		if (toShow == null)
