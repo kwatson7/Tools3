@@ -197,15 +197,17 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
      * Try to create the thumbnail from the full picture
      * @param thumbPath the desired thumbnail path
      * @param fullFile the path to the full file
-     * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
+     * @param maxPixelSize the maximum size in pixels for any dimension of the thumbnail. 
      * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
+     * @param imageQuality 0-100 quality setting (90 is usually a good compromise of size and quality)
      * @return true if successful, false otherwise
      */
     public static boolean createThumbnailFromFull(
     		String thumbPath,
     		String fullFile,
     		int maxPixelSize,
-    		boolean forceBase2){
+    		boolean forceBase2,
+    		int imageQuality){
     	
     	// open the full file
     	if (fullFile == null || thumbPath == null || fullFile.length() == 0 || thumbPath.length() == 0)
@@ -241,7 +243,8 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				b,
 				rotation,
 				maxPixelSize,
-				forceBase2);
+				forceBase2,
+				imageQuality);
 
 		// save the thumbnail
 		SuccessReason thumbnailSave = 

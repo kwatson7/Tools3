@@ -372,13 +372,15 @@ public class Tools {
 	 * @param newWidthHeight New desired width and height
 	 * @param orientationAngle Float for the orientation of the byte array. If the data
 	 * is already stored in the byte array, then pass null and the value will be extracted.
+     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
 	 * @throws IllegalArgumentException if cropFlag is not the right input type
 	 */
 	public static byte[] resizeByteArray(byte[] input, 
 			WidthHeight newWidthHeight, 
 			String cropFlag, 
 			Context ctx, 
-			Float orientationAngle) 
+			Float orientationAngle,
+            int imageQuality) 
 	throws IllegalArgumentException{
 
 		// grab orientation angle from exif data
@@ -487,7 +489,7 @@ public class Tools {
 
 		// turn back into byte array
 		ByteArrayOutputStream out = new ByteArrayOutputStream(resizedBitmap.getWidth()*resizedBitmap.getHeight());
-		resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);   
+		resizedBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
 		byte[] result = out.toByteArray();
 
 		return result;		
@@ -498,12 +500,14 @@ public class Tools {
 	 * @param ctx Context context, usually getApplicationContext
 	 * @param orientationAngle Float for the orientation of the byte array. If the data
 	 * is already stored in the byte array, then pass null and the value will be extracted.
+     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
 	 * @throws IllegalArgumentException if cropFlag is not the right input type
 	 */
 	public static byte[] rotateByteArray(
 			byte[] input, 
 			Context ctx, 
-			Float orientationAngle){
+			Float orientationAngle,
+            int imageQuality){
 
 		// grab orientation angle from exif data
 		if (orientationAngle == null)
@@ -549,7 +553,7 @@ public class Tools {
 
 		// turn back into byte array
 		ByteArrayOutputStream out = new ByteArrayOutputStream(resizedBitmap.getWidth()*resizedBitmap.getHeight());
-		resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);   
+		resizedBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
 		byte[] result = out.toByteArray();
 
 		return result;		
@@ -1070,13 +1074,15 @@ public class Tools {
 	 * @param maxThumbnailDimension The maximum thumbnail dimension in either height or width
 	 * @param forceBase2 If we force to downsample by base2, it is faster, but then we can only
 	 * resize by a factor of 2,4,8,16...
+     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
 	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL
 	 */
 	public static byte[] makeThumbnail(
 			final byte[] imageData,
 			int exifOrientation,
 			final int maxThumbnailDimension,
-			boolean forceBase2){
+			boolean forceBase2,
+            int imageQuality){
 			
 		if (imageData == null || imageData.length == 0)
 			return null;
@@ -1127,7 +1133,7 @@ public class Tools {
 		
 		// convert back to byte array.
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();  
-		thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+		thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, baos);
 		byte[] byteArray = baos.toByteArray();
 		
 		// return result
@@ -1290,12 +1296,14 @@ public class Tools {
      * @param fullFile the path to the full file
      * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
      * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
+     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
      * @return the bitmap, or null if any errors occured
      */
     public static Bitmap getThumbnail(
     		String fullFile,
     		int maxPixelSize,
-    		boolean forceBase2){
+    		boolean forceBase2,
+            int imageQuality){
     	
     	// open the full file
     	if (fullFile == null || fullFile.length() == 0)
@@ -1331,7 +1339,8 @@ public class Tools {
 				b,
 				rotation,
 				maxPixelSize,
-				forceBase2);
+				forceBase2,
+                imageQuality);
 		
 		if (thumbnail == null)
 			return null;
