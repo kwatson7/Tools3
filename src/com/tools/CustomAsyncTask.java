@@ -4,12 +4,10 @@ import java.util.ArrayList;
 
 import com.tools.CustomActivity;
 
-import android.R;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.AsyncTask;
-import android.view.Window;
 import android.widget.ProgressBar;
 
 /**
@@ -23,10 +21,11 @@ import android.widget.ProgressBar;
  * @param <PROGRESS>
  * @param <RESULT>
  */
-public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTask<INPUT, PROGRESS, RESULT>{
+public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PROGRESS, RESULT>
+	extends AsyncTask<Void, PROGRESS, RESULT>{
 
 	/** The calling activity that this task is attached to	 */
-	protected CustomActivity callingActivity;
+	protected ACTIVITY_TYPE callingActivity;
 	/** The application context this task is attached to. Use this if we want the task to last after activity quits. */
 	protected Context applicationCtx;
 	/**  boolean whether we should attach to application as well (longer lifecycle) */
@@ -39,9 +38,11 @@ public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTas
 	protected ArrayList<String> progressBars = null;
 	/** A progressDialog to show and hide when starting and completing task. The showing and hiding is done automatically.*/
 	protected ProgressDialog dialog = null;
+	/** the callback to run when onPostExectueOverride is done */
+	private FinishedCallback<ACTIVITY_TYPE, RESULT> finishedCallback;
 	
 	/**
-	 * Constructor.
+	 * Constructor. This task will be added to teh calling activities list of tasks to manage.
 	 * @param act the calling activity
 	 * @param requestId A custom id to identify the asynctask to the calling activity
 	 * @param isAttachToApplication boolean to keep activity attached to application, not just activity
@@ -49,7 +50,8 @@ public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTas
 	 * the subclassed task, make sure to call isCanceled() periodically in doInBackground, to break.
 	 * @param progressBars an array of progress bar identifier string that will be automatically started and stopped at the appropriate time
 	 */
-	public CustomAsyncTask(CustomActivity act,
+	public CustomAsyncTask(
+			ACTIVITY_TYPE act,
 			int requestId,
 			boolean isAttachToApplication, 
 			boolean isCancelOnActivityDestroy,
@@ -60,14 +62,27 @@ public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTas
 		this.requestId = requestId;
 		this.isCancelOnActivityDestroy = isCancelOnActivityDestroy;
 		this.progressBars = progressBars;
+		
+		// save this task to the list of activity tasks
+		act.addTask(this);
+		
+		// attach to the activity
 		attach(act);	
+	}
+	
+	/**
+	 * This callback will be run after onPostExecuteOverride on the UI thread. <br>
+	 * @param callback the callback to run.
+	 */
+	public void setFinishedCallback(FinishedCallback<ACTIVITY_TYPE, RESULT> callback){
+		finishedCallback = callback;
 	}
 
 	@Override
 	protected abstract void onPreExecute();
 	
 	@Override
-	protected abstract RESULT doInBackground(INPUT... params);
+	protected abstract RESULT doInBackground(Void... params);
 
 	@Override
 	protected abstract void onProgressUpdate(PROGRESS... progress);
@@ -80,6 +95,11 @@ public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTas
             
 		// users method, then detach
 		onPostExectueOverride(result);
+		
+		// the callback if we have one
+		if (finishedCallback != null){
+			finishedCallback.onFinish(callingActivity, result);
+		}
 		
 		// detach from calling context to free the link
 		detachAll();
@@ -103,7 +123,7 @@ public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTas
      *           myAsyncTask.attach(this);  // Give my AsyncTask the new Activity reference} <br>
 	 * @param ctx The calling context
 	 */
-	public void attach(CustomActivity act){
+	public void attach(ACTIVITY_TYPE act){
 		callingActivity = act;
 		if (this.isAttachToApplication && act != null)
 			attachToApplicationProcess(act);
@@ -261,5 +281,17 @@ public abstract class CustomAsyncTask <INPUT, PROGRESS, RESULT> extends AsyncTas
 	 */
 	final public boolean isCancelOnActivityDestroy(){
 		return isCancelOnActivityDestroy;
+	}
+	
+	public interface FinishedCallback<ACTIVITY_TYPE, RESULT>{
+		/**
+		 * Runs on the UI thread after onPostExectueOverride. <br>
+		 * *** NOTE: do not reference member variables of enclosing activity if this is an anonymouse call, or the activity will leak .
+		 * Use the activity passed in this method to access those variables, not the variables directly. <br>
+		 * eg. activity.memberVariable, not memberVariable directly. *** <br>
+		 * @param activity The current activity this activity is attached to. Will work across orientation changes.
+		 * @param result The result passed from DoInBackground
+		 */
+		public void onFinish(ACTIVITY_TYPE activity, RESULT result);
 	}
 }

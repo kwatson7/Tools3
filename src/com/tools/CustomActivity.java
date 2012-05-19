@@ -25,7 +25,8 @@ extends Activity{
 	protected ConfigurationProperties configurationProperties = null;
 	
 	/** The list of async tasks, that will be automatically attached and detached to activity on configruation chagnes */
-	private ArrayList<CustomAsyncTask> asyncArray = new ArrayList<CustomAsyncTask>();
+	private ArrayList<CustomAsyncTask> asyncArray = 
+		new ArrayList<CustomAsyncTask>();
 	
 	/**
 	 * Add a task to the list of async tasks
@@ -71,7 +72,7 @@ extends Activity{
 			ArrayList<CustomAsyncTask> array = configurationProperties.asyncArrayConfig;
 			if (array != null){
 				for (int i = 0; i < array.size(); i++){
-					com.tools.CustomAsyncTask task = array.get(i);
+					CustomAsyncTask task = array.get(i);
 					if (task != null){
 						if (task.isFinished()){
 							task.detach();
