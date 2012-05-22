@@ -1350,6 +1350,36 @@ public class Tools {
 	}
     
     /**
+     * Read a file into a byte[]. Output will be null if file cannot be read
+     * @param fileName the file to read
+     * @return the byte[] of the file
+     */
+    public static byte[] readFile(String fileName){
+    	// open the full file
+    	if (fileName == null || fileName.length() == 0)
+    		return null;
+    	RandomAccessFile f = null;
+    	try{
+    		f = new RandomAccessFile(fileName, "r");
+    	}catch (FileNotFoundException  e){
+    		return null;
+    	}
+    	
+    	// read the file data
+    	byte[] b = null;
+    	try{
+    		b = new byte[(int)f.length()];
+    		f.read(b);
+    		f.close();
+    	}catch(IOException e){
+    		Log.e("com.tools.Tools", Log.getStackTraceString(e));
+    		return null;
+    	}
+
+    	return b;
+    }
+    
+    /**
      * Save the view and all its children to a bitmap <br>
      * @param view the view to save
      * @param viewsToHide a list of views to hide before creating the bitmap, null is acceptabl

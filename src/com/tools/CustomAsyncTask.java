@@ -64,7 +64,8 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 		this.progressBars = progressBars;
 		
 		// save this task to the list of activity tasks
-		act.addTask(this);
+		if (act != null)
+			act.addTask(this);
 		
 		// attach to the activity
 		attach(act);	
@@ -286,7 +287,7 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 	public interface FinishedCallback<ACTIVITY_TYPE, RESULT>{
 		/**
 		 * Runs on the UI thread after onPostExectueOverride. <br>
-		 * *** NOTE: do not reference member variables of enclosing activity if this is an anonymouse call, or the activity will leak .
+		 * *** NOTE: do not reference member variables of enclosing activity if this is an anonymous call, or the activity will leak.
 		 * Use the activity passed in this method to access those variables, not the variables directly. <br>
 		 * eg. activity.memberVariable, not memberVariable directly. *** <br>
 		 * @param activity The current activity this activity is attached to. Will work across orientation changes.
