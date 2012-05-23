@@ -214,12 +214,15 @@ public class ServerPost {
 	 * @param act The activity to post the callback to. Can be null
 	 * @param callback the callback to call when post is finished
 	 */
-	public <ACTIVITY_TYPE extends CustomActivity> void postInBackground(
+	public <ACTIVITY_TYPE extends CustomActivity>
+	void postInBackground(
 			ACTIVITY_TYPE  act,
 			final PostCallback<ACTIVITY_TYPE> callback){
 
 		// setup background thread and execute
-		PostAsync<ACTIVITY_TYPE> task = new PostAsync<ACTIVITY_TYPE>(act, callback);
+		PostAsync<ACTIVITY_TYPE> task = 
+			new PostAsync<ACTIVITY_TYPE>(act, callback);
+			
 		task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
 
 			@Override
@@ -237,6 +240,10 @@ public class ServerPost {
 	extends CustomAsyncTask<ACTIVITY_TYPE, Void, ServerReturn>{
 
 		private PostCallback<ACTIVITY_TYPE> callback;
+<<<<<<< HEAD
+=======
+		
+>>>>>>> 5b79288023d53d34f55db5ac92d04466d5bac202
 		private PostAsync(
 				ACTIVITY_TYPE act,
 				final PostCallback<ACTIVITY_TYPE> callback) {
