@@ -302,6 +302,13 @@ public class ServerPost {
 		 * Generic exception error
 		 */
 		public static final String GENERIC_EXCEPTION = "GENERIC_EXCEPTION";
+		
+		/**
+		 * Unknown error code
+		 */
+		public static final String UNKNOWN_ERROR_CODE = "UNKNOWN_ERROR_CODE";
+		
+		private static final String UNKNOWN_ERROR_STRING = "Unknown error";
 
 		/**
 		 * Create a completed server return item
@@ -314,6 +321,13 @@ public class ServerPost {
 			// store values
 			this.serverReturnValue = serverReturnValue;
 			this.serverReturnValueLastLine = serverReturnValueLastLine;
+		}
+		
+		/**
+		 * Initialize return with unknown error
+		 */
+		public ServerReturn(){
+			setError(UNKNOWN_ERROR_CODE, UNKNOWN_ERROR_STRING);
 		}
 		
 		/**

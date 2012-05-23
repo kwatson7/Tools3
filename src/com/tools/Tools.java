@@ -123,7 +123,7 @@ public class Tools {
 	 * <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 	 * @param ctx Context where various android data is pulled from, usually getApplicationContext
 	 * @param data Byte array of data to be stored
-	 * @param caption Caption to be stored for picture file
+	 * @param caption Caption to be stored for picture file. (not used at teh moment)
 	 * @param displayToast Boolean to display toast message
 	 * @param fileNameInput write data to this filename. If null, then writes to next available file on external storage
 	 * @param exifOrientation the orientation to store in exif header. See ExifInterface for details. Input null to not save anything.
@@ -140,6 +140,7 @@ public class Tools {
 
 		//TODO: save correct gps data
 		//TODO: this whole method needs to be cleaned up
+		//TODO: actually store caption
 
 		// initialize result and fileName
 		SuccessReason result = new SuccessReason(true);
