@@ -240,10 +240,7 @@ public class ServerPost {
 	extends CustomAsyncTask<ACTIVITY_TYPE, Void, ServerReturn>{
 
 		private PostCallback<ACTIVITY_TYPE> callback;
-<<<<<<< HEAD
-=======
-		
->>>>>>> 5b79288023d53d34f55db5ac92d04466d5bac202
+
 		private PostAsync(
 				ACTIVITY_TYPE act,
 				final PostCallback<ACTIVITY_TYPE> callback) {
