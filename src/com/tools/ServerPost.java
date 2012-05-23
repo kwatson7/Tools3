@@ -7,15 +7,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.FileEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
@@ -26,10 +23,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.tools.CustomAsyncTask.FinishedCallback;
-import com.tools.ServerPost.ServerReturn;
-
-import android.app.Activity;
 import android.util.Log;
 
 public class ServerPost {
@@ -240,11 +233,11 @@ public class ServerPost {
 	/**
 	 * class used to post to server in the background
 	 */
-	public class PostAsync <ACTIVITY_TYPE extends CustomActivity>
+	private class PostAsync <ACTIVITY_TYPE extends CustomActivity>
 	extends CustomAsyncTask<ACTIVITY_TYPE, Void, ServerReturn>{
 
 		private PostCallback<ACTIVITY_TYPE> callback;
-		public PostAsync(
+		private PostAsync(
 				ACTIVITY_TYPE act,
 				final PostCallback<ACTIVITY_TYPE> callback) {
 			super(
@@ -285,86 +278,127 @@ public class ServerPost {
 		// member variables
 		private String serverReturnValue = "";
 		private String serverReturnValueLastLine = "";
-		private ReturnType returnType;
-		private String detailMessage = "";
+		private String detailErrorMessage = "";
+		private String errorCode = "";
 
-		// enums for server return types
-		public enum ReturnType {
-			// different return types
-			/** 
-			 * Return with a return code of 200 and parsed return data
-			 */
-			COMPLETED, 
-
-			/**
-			 * Returned with a code other than 200
-			 */
-			BAD_CODE,
-
-			/**
-			 * Error with the post
-			 */
-			CLIENT_PROTOCOL_ERROR,
-
-			/**
-			 * Error reading return
-			 */
-			IO_EXCEPTION;
-		}
+		// builtin error codes
+		/**
+		 * Returned with a code other than 200
+		 */
+		public static final String BAD_CODE = "BAD_CODE";
+		/**
+		 * Error with the post
+		 */
+		public static final String CLIENT_PROTOCOL_ERROR = "CLIENT_PROTOCOL_ERROR";
+		/**
+		 * Error reading return
+		 */
+		public static final String IO_EXCEPTION = "IO_EXCEPTION";
+		/**
+		 * Generic exception error
+		 */
+		public static final String GENERIC_EXCEPTION = "GENERIC_EXCEPTION";
 
 		/**
 		 * Create a completed server return item
 		 * @param serverReturnValue the entire return from the server
 		 * @param serverReturnValueLastLine just the last line return from the server
 		 */
-		public ServerReturn(
+		private ServerReturn(
 				String serverReturnValue,
 				String serverReturnValueLastLine){
 			// store values
 			this.serverReturnValue = serverReturnValue;
 			this.serverReturnValueLastLine = serverReturnValueLastLine;
-			this.returnType = ReturnType.COMPLETED;
+		}
+		
+		/**
+		 * Copy a serverReturn object
+		 * @param toCopy
+		 */
+		public ServerReturn(ServerReturn toCopy){
+			this.serverReturnValue = toCopy.serverReturnValue;
+			this.serverReturnValueLastLine = toCopy.serverReturnValueLastLine;
+			this.detailErrorMessage = toCopy.detailErrorMessage;
+			this.errorCode = toCopy.errorCode;
 		}
 
 		/**
 		 * Create a return value that is just the bad code.
-		 * @param code
+		 * @param code the return code from the server
 		 */
-		public ServerReturn(int code){
-			this.returnType = ReturnType.BAD_CODE;
-			this.detailMessage = String.valueOf(code);
+		private ServerReturn(int code){
+			detailErrorMessage = String.valueOf(code);
+			errorCode = BAD_CODE;
 		}
 
 		/**
 		 * Create a server return that had a bad client protocol
 		 * @param e the exception that was thrown
 		 */
-		public ServerReturn(ClientProtocolException e){
-			this.returnType = ReturnType.CLIENT_PROTOCOL_ERROR;
-			this.detailMessage = e.getMessage();
+		private ServerReturn(ClientProtocolException e){
+			errorCode = CLIENT_PROTOCOL_ERROR;
+			detailErrorMessage = e.getMessage();
 		}
 
 		/**
 		 * Create a server return that had a bad io
 		 * @param e the exception that was thrown
 		 */
-		public ServerReturn(IOException e){
-			this.returnType = ReturnType.IO_EXCEPTION;
-			this.detailMessage = e.getMessage();
+		private ServerReturn(IOException e){
+			errorCode = IO_EXCEPTION;
+			detailErrorMessage = e.getMessage();
 		}
-
+		
 		/**
-		 * @return the return type from the server
+		 * Set the error message for the return
+		 * @param errorCode The identifying error code
+		 * @param detailErrorMessage The detailed error message
 		 */
-		public ReturnType getReturnType(){
-			return returnType;
+		public void setError(String errorCode, String detailErrorMessage){
+			this.errorCode = errorCode;
+			this.detailErrorMessage = detailErrorMessage;
+		}
+		
+		/**
+		 * Set the error of the return value with the given exception.
+		 * @param e the exception
+		 */
+		public void setError(Exception e){
+			this.errorCode = GENERIC_EXCEPTION;
+			this.detailErrorMessage = e.getMessage();
+		}
+		
+		/**
+		 * Return true if we don't have any errors
+		 * @return
+		 */
+		final public boolean isSuccess(){
+			return (errorCode == null || errorCode.length() == 0 && isSuccessCustom());
+		}
+		
+		/**
+		 * This method must also be true to be considered a success. <br>
+		 * Override this if you want. Default always returns true
+		 * @return True for custom success and false otherwise. Defaults to true, unless overriden
+		 */
+		protected boolean isSuccessCustom(){
+			return true;
 		}
 
 		/**
 		 * @return the detail message of the return
 		 */
-		public String getDetailMessage(){
-			return detailMessage;
+		public String getDetailErrorMessage(){
+			return detailErrorMessage;
+		}
+		
+		/**
+		 * Return the error code of the return
+		 * @return
+		 */
+		public String getErrorCode(){
+			return errorCode;
 		}
 
 		/**
@@ -377,7 +411,7 @@ public class ServerPost {
 		/**
 		 * @return Only the last line of the server return value
 		 */
-		public String getServerReturnLastLine(){
+		final public String getServerReturnLastLine(){
 			return serverReturnValueLastLine;
 		}
 		
@@ -385,7 +419,7 @@ public class ServerPost {
 		 * Return the server output as a JSON object. Will be null if we could not convert to a JSON object
 		 * @return
 		 */
-		public JSONObject getJSONObject(){
+		final public JSONObject getJSONObject(){
 			JSONObject out = null;
 			try {
 				out = new JSONObject(getServerReturnLastLine());
@@ -400,7 +434,7 @@ public class ServerPost {
 		 * Return the server output as a JSON Array. Will be null if we could not convert to a JSON Array
 		 * @return
 		 */
-		public JSONArray getJSONArray(){
+		final public JSONArray getJSONArray(){
 			JSONArray out = null;
 			try {
 				out = new JSONArray(getServerReturnLastLine());
