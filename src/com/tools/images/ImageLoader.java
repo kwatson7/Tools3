@@ -18,6 +18,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
+import android.util.Log;
 import android.widget.ImageView;
 
 public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
@@ -163,6 +164,39 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
     }
     
     /**
+     * Read a picture from the given byte[], return null if unsuffessful <br>
+     * Make sure to NOT call on main UI thread because it's slow <br>
+     * Will be properly rotated based on exif data stored in image
+     * @param inputData the byte array
+     * @param angle the rotation angle to rotate the data
+     * @return the bitmap
+     */
+    public static Bitmap getThumbnail(
+    		byte[] inputData,
+    		float angle){
+    	// open the path if it exists
+    	if (inputData != null && inputData.length != 0){
+    		
+    		// read the bitmap
+    		Bitmap bmp = BitmapFactory.decodeByteArray(inputData, 0, inputData.length);
+    		if (bmp == null)
+    			return bmp;
+    		
+    		// now do the rotation
+    		if (angle != 0) {
+    			Matrix matrix = new Matrix();
+    			matrix.postRotate(angle);
+
+    			bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+    					bmp.getHeight(), matrix, true);
+    		}
+    		return bmp;
+		}
+    	else	
+    		return null;
+    }
+    
+    /**
      * Read a picture from the given path, return null if unsuffessful <br>
      * Make sure to NOT call on main UI thread because it's slow <br>
      * Will be properly rotated based on exif data stored in image
@@ -260,6 +294,55 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		return thumbnailSave.getSuccess();
 	}
 
+    /**
+     * Return the properly rotated full image, null if can't be found or any other error <br>
+     * Make sure to only call NOT on main ui thread <br>
+     * It will be scaled down, so as not to cause memory crash
+     * @param inputData the data that needs to be resized
+     * @param angle the angle to rotate the data
+     * @param desiredWidth the desired width of the image, will not necessarily create a bitmap of this exact size, but no larger than this
+     * @param desiredHeight the desired height of the image, will not necessarily create a bitmap of this exact size, but no larger than this
+     * @return The bitmap or null if failed.
+     */
+    public static Bitmap getFullImage(
+    		byte[] inputData,
+    		float angle,
+    		int desiredWidth,
+    		int desiredHeight){
+    	try{
+    		if (inputData != null && inputData.length != 0){
+
+    			//decode image size
+    			BitmapFactory.Options o = new BitmapFactory.Options();
+    			o.inJustDecodeBounds = true;
+    			BitmapFactory.decodeByteArray(inputData, 0, inputData.length, o);
+
+    			// find the correct scale size
+    			double scale = ((double)Math.max((double)o.outHeight/desiredHeight, (double)o.outWidth/desiredWidth));
+    			int intScale = (int)Math.pow(2, Math.ceil(com.tools.MathTools.log2(scale)));
+
+    			// now actually do the resizeing
+    			BitmapFactory.Options options = new BitmapFactory.Options();
+    			options.inSampleSize = intScale;
+    			Bitmap bitmap = BitmapFactory.decodeByteArray(inputData, 0, inputData.length, options);	
+
+    			// now do the rotation
+    			if (angle != 0) {
+    				Matrix matrix = new Matrix();
+    				matrix.postRotate(angle);
+
+    				bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),
+    						bitmap.getHeight(), matrix, true);
+    			}
+
+    			return bitmap;
+    		}else
+    			return null;
+    	}catch(Exception e){
+    		Log.e("ImageLoader", Log.getStackTraceString(e));
+    		return null;
+    	}
+    }
     
     /**
      * Return the properly rotated full image, null if can't be found or any other error <br>
