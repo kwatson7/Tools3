@@ -443,6 +443,7 @@ public class ServerPost {
 				out = new JSONObject(getServerReturnLastLine());
 			} catch (JSONException e) {
 				out = null;
+				Log.e("ServerPost", getServerReturnLastLine());
 				Log.e("ServerPost", Log.getStackTraceString(e));
 			}
 			return out;
