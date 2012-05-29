@@ -2,6 +2,8 @@ package com.tools.images;
 
 import java.lang.ref.SoftReference;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Set;
 
 import com.tools.TwoObjects;
 
@@ -83,6 +85,19 @@ public class MemoryCache <ID_TYPE> {
      * Clear the cache
      */
     public void clear() {
+    	/*
+    	Set<ID_TYPE> keys = cache.keySet();
+    	Iterator<ID_TYPE> it = keys.iterator();
+    	while(it.hasNext()){
+    		ID_TYPE id = it.next();
+    		Bitmap full = getFullPicture(id);
+    		if (full != null)
+    			full.recycle();
+    		Bitmap thumb = getThumbnail(id);
+    		if (thumb != null)
+    			thumb.recycle();
+    	}
+    	*/
         cache.clear();
     }
     

@@ -38,6 +38,7 @@ import android.media.ExifInterface;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Debug;
 import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
@@ -1555,5 +1556,25 @@ public class Tools {
 		if (newWidth <= 0 || newHeight <= 0)
 			return null;
 		return Bitmap.createBitmap(bitmap, colStart, rowStart, newWidth, newHeight);	
+    }
+    
+    /**
+     * Checks if a bitmap with the specified size fits in memory
+     * @param bmpwidth Bitmap width
+     * @param bmpheight Bitmap height
+     * @param bmpdensity Bitmap bpp (use 2 as default)
+     * @return true if the bitmap fits in memory false otherwise
+     */
+    public static boolean checkBitmapFitsInMemory(long bmpwidth,long bmpheight, int bmpdensity ){
+        long reqsize=bmpwidth*bmpheight*bmpdensity;
+        long allocNativeHeap = Debug.getNativeHeapAllocatedSize();
+
+
+        final long heapPad=(long) Math.max(4*1024*1024,Runtime.getRuntime().maxMemory()*0.1);
+        if ((reqsize + allocNativeHeap + heapPad) >= Runtime.getRuntime().maxMemory())
+        {
+            return false;
+        }
+        return true;
     }
 }

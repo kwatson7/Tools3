@@ -10,12 +10,12 @@ import java.nio.charset.Charset;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
+import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.CoreProtocolPNames;
@@ -23,6 +23,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.os.Debug;
 import android.util.Log;
 
 public class ServerPost {
@@ -30,6 +31,7 @@ public class ServerPost {
 	// class members
 	private String url; 											// the url to post to
 	private MultipartEntity multipartEntity; 						// the form post holder
+	private boolean keepFullReturn = false;
 
 	// constants
 	private final Charset ENCODING_TYPE = Charset.forName("UTF-8"); // the type of the data
@@ -82,6 +84,13 @@ public class ServerPost {
 		multipartEntity = new MultipartEntity(
 				HttpMultipartMode.BROWSER_COMPATIBLE);
 	}
+	
+	/**
+	 * @param value true to keep entire return, false to only keep last line of return. Defaults to false.
+	 */
+	public void setKeepFullReturn(boolean value){
+		keepFullReturn = value;
+	}
 
 	/**
 	 * Add a string value to the post
@@ -106,6 +115,29 @@ public class ServerPost {
 	public void addFile(String key, byte[] data, FileType fileType, String fileName){
 		multipartEntity.addPart(key, new ByteArrayBody(data, fileType.getType(), fileName));
 	}
+	
+	/**
+	 * Add file to the post. If the file doesn't exist, a log error is posted 
+	 * @param key the key to assign to data
+	 * @param path The path name of file.
+	 * @return true if we successfully added the data, false if the file doesn't exist
+	 */
+	public boolean addFile(String key, String path, FileType fileType){
+		// check that the file exists
+		if (path == null || path.length() == 0){
+			Log.e("ServerPost", "bad file input into addFile");
+			return false;
+		}
+		File file = new File(path);
+		if (!file.exists()){
+			Log.e("ServerPost", "File " + path + " does not exist");
+			return false;
+		}
+			
+		// add the file to the post
+		multipartEntity.addPart(key, new FileBody(file, fileType.getType()));
+		return true;
+	}
 
 	/**
 	 * Add a file to the post with a random file name attached
@@ -127,7 +159,7 @@ public class ServerPost {
 	 * @param fileName the filename full path. Just the name of the file will be associated with this post
 	 * @return true if we were able to read the file, and false otherwise.
 	 */
-	public boolean addFile(String key, FileType fileType, String fileName){
+	public boolean addFileDONTUSE(String key, FileType fileType, String fileName){
 		// read the file
 		byte[] data = com.tools.Tools.readFile(fileName);
 		if (data == null)
@@ -184,13 +216,21 @@ public class ServerPost {
 				InputStream content = entity.getContent();
 				BufferedReader reader = new BufferedReader(new InputStreamReader(content));
 				String line;
-				StringBuilder builder = new StringBuilder();
+				StringBuilder builder = null;
+				if (keepFullReturn)
+					builder = new StringBuilder();
 				while ((line = reader.readLine()) != null) {
-					builder.append(line + "\n");
+					if (keepFullReturn){
+						builder.append(line);
+						builder.append("\n");
+					}
 					serverReturnValueLastLine = line;
 				}
 				content.close();
-				serverReturnValue = builder.toString();
+				if (keepFullReturn)
+					serverReturnValue = builder.toString();
+				else
+					serverReturnValue = serverReturnValueLastLine;
 
 				// bad return code
 			} else {
@@ -284,6 +324,8 @@ public class ServerPost {
 		private String serverReturnValueLastLine = "";
 		private String detailErrorMessage = "";
 		private String errorCode = "";
+		private JSONArray jsonArray = null;
+		private JSONObject jsonObject = null;
 
 		// builtin error codes
 		/**
@@ -339,6 +381,8 @@ public class ServerPost {
 			this.serverReturnValueLastLine = toCopy.serverReturnValueLastLine;
 			this.detailErrorMessage = toCopy.detailErrorMessage;
 			this.errorCode = toCopy.errorCode;
+			this.jsonArray = toCopy.jsonArray;
+			this.jsonObject = toCopy.jsonObject;
 		}
 
 		/**
@@ -348,15 +392,6 @@ public class ServerPost {
 		private ServerReturn(int code){
 			detailErrorMessage = String.valueOf(code);
 			errorCode = BAD_CODE;
-		}
-
-		/**
-		 * Create a server return that had a bad client protocol
-		 * @param e the exception that was thrown
-		 */
-		private ServerReturn(ClientProtocolException e){
-			errorCode = CLIENT_PROTOCOL_ERROR;
-			detailErrorMessage = e.getMessage();
 		}
 
 		/**
@@ -438,14 +473,18 @@ public class ServerPost {
 		 * @return
 		 */
 		final public JSONObject getJSONObject(){
+			if (jsonObject != null)
+				return jsonObject;
 			JSONObject out = null;
 			try {
 				out = new JSONObject(getServerReturnLastLine());
 			} catch (JSONException e) {
+				jsonObject = null;
 				out = null;
 				Log.e("ServerPost", getServerReturnLastLine());
 				Log.e("ServerPost", Log.getStackTraceString(e));
 			}
+			jsonObject = out;
 			return out;
 		}
 		
@@ -454,20 +493,26 @@ public class ServerPost {
 		 * @return
 		 */
 		final public JSONArray getJSONArray(){
+			if (jsonArray != null)
+				return jsonArray;
 			JSONArray out = null;
 			try {
 				out = new JSONArray(getServerReturnLastLine());
 			} catch (JSONException e) {
+				jsonArray = null;
 				out = null;
+				Log.e("ServerPost", getServerReturnLastLine());
 				Log.e("ServerPost", Log.getStackTraceString(e));
 			}
+			
+			jsonArray = out;
 			return out;
 		}
 	}
 
 	public interface PostCallback <ACTIVITY_TYPE extends CustomActivity>{
 		/**
-		 * This is called when we are done posting to the server on the calling thread
+		 * This is called when we are done posting to the server on the background thread
 		 * @param the activity that is currently active after the task completed
 		 * @param result The server result
 		 */
