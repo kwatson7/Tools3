@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -18,25 +19,29 @@ import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.CoreProtocolPNames;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.os.Debug;
 import android.util.Log;
 
 public class ServerPost {
-
-	// class members
-	private String url; 											// the url to post to
-	private MultipartEntity multipartEntity; 						// the form post holder
-	private boolean keepFullReturn = false;
 
 	// constants
 	private final Charset ENCODING_TYPE = Charset.forName("UTF-8"); // the type of the data
 	private final int RANDOM_FILENAME_LENGTH = 64; 					// if we create a random filename, the length of the filename
 	private final int GOOD_RETURN_CODE = 200; 						// The return code for a successful sync with server
+
+	// class members
+	private String url; 											// the url to post to
+	private MultipartEntity multipartEntity; 						// the form post holder
+	private boolean keepFullReturn = false;
+	private int timeoutConnection = 5000; 							// Default to wait for timeout to connect			
+	private int timeoutSocket = 30000; 								// Default length of time to wait for returned data
 
 	//enums for file types
 	public enum FileType {
@@ -76,6 +81,22 @@ public class ServerPost {
 	}
 
 	/**
+	 * Set the timeout to wait for a connection in milliseconds. Defaults to 5,000ms
+	 * @param connectionTimeoutMs The timeout in ms
+	 */
+	public void setConnectionTimeout(int connectionTimeoutMs){
+		timeoutConnection = connectionTimeoutMs;
+	}
+
+	/**
+	 * Set the timeout to wait for data in milliseconds. Defaults to 30,000ms
+	 * @param socketTimeoutMs The timeout in ms
+	 */
+	public void setSocketTimeout(int socketTimeoutMs){
+		timeoutSocket = socketTimeoutMs;
+	}
+
+	/**
 	 * Various initialization steps
 	 */
 	private void initializeOptions(){
@@ -84,7 +105,7 @@ public class ServerPost {
 		multipartEntity = new MultipartEntity(
 				HttpMultipartMode.BROWSER_COMPATIBLE);
 	}
-	
+
 	/**
 	 * @param value true to keep entire return, false to only keep last line of return. Defaults to false.
 	 */
@@ -115,7 +136,7 @@ public class ServerPost {
 	public void addFile(String key, byte[] data, FileType fileType, String fileName){
 		multipartEntity.addPart(key, new ByteArrayBody(data, fileType.getType(), fileName));
 	}
-	
+
 	/**
 	 * Add file to the post. If the file doesn't exist, a log error is posted 
 	 * @param key the key to assign to data
@@ -133,7 +154,7 @@ public class ServerPost {
 			Log.e("ServerPost", "File " + path + " does not exist");
 			return false;
 		}
-			
+
 		// add the file to the post
 		multipartEntity.addPart(key, new FileBody(file, fileType.getType()));
 		return true;
@@ -181,8 +202,13 @@ public class ServerPost {
 	 */
 	public ServerReturn post(){
 
+		// set the connection parameters
+		HttpParams httpParameters = new BasicHttpParams();
+		HttpConnectionParams.setConnectionTimeout(httpParameters, timeoutConnection);
+		HttpConnectionParams.setSoTimeout(httpParameters, timeoutSocket);
+
 		// initialize http client and post to correct page
-		HttpClient client = new DefaultHttpClient();
+		HttpClient client = new DefaultHttpClient(httpParameters);
 
 		// initialize post
 		HttpPost httpPost = new HttpPost(url);
@@ -239,6 +265,9 @@ public class ServerPost {
 			}
 
 			// different failures	
+		}catch( UnknownHostException e){
+			ServerReturn value = new ServerReturn(e);
+			return value;
 		} catch (IOException e) {
 			ServerReturn value = new ServerReturn(e);
 			return value;
@@ -261,16 +290,16 @@ public class ServerPost {
 
 		// setup background thread and execute
 		PostAsync<ACTIVITY_TYPE> task = 
-			new PostAsync<ACTIVITY_TYPE>(act, callback);
-			
-		task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
+				new PostAsync<ACTIVITY_TYPE>(act, callback);
 
-			@Override
-			public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
-				callback.onPostFinishedUiThread(activity, result);					
-			}
-		});
-		task.execute();
+				task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
+
+					@Override
+					public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
+						callback.onPostFinishedUiThread(activity, result);					
+					}
+				});
+				task.execute();
 	}
 
 	/**
@@ -344,14 +373,19 @@ public class ServerPost {
 		 * Generic exception error
 		 */
 		public static final String GENERIC_EXCEPTION = "GENERIC_EXCEPTION";
-		
+
 		/**
 		 * Unknown error code
 		 */
 		public static final String UNKNOWN_ERROR_CODE = "UNKNOWN_ERROR_CODE";
-		
 		private static final String UNKNOWN_ERROR_STRING = "Unknown error";
-
+		
+		/**
+		 * Unknown host
+		 */
+		public static final String UNKNOWN_HOST_EXCEPTION = "UNKNOWN_HOST_EXCEPTION";
+		private static final String UNKNOWN_HOST_EXCEPTION_STRING = "Error accessing host. Check internet connection: ";
+		
 		/**
 		 * Create a completed server return item
 		 * @param serverReturnValue the entire return from the server
@@ -364,14 +398,14 @@ public class ServerPost {
 			this.serverReturnValue = serverReturnValue;
 			this.serverReturnValueLastLine = serverReturnValueLastLine;
 		}
-		
+
 		/**
 		 * Initialize return with unknown error
 		 */
 		public ServerReturn(){
 			setError(UNKNOWN_ERROR_CODE, UNKNOWN_ERROR_STRING);
 		}
-		
+
 		/**
 		 * Copy a serverReturn object
 		 * @param toCopy
@@ -403,6 +437,11 @@ public class ServerPost {
 			detailErrorMessage = e.getMessage();
 		}
 		
+		private ServerReturn(UnknownHostException e){
+			errorCode = UNKNOWN_HOST_EXCEPTION;
+			detailErrorMessage = UNKNOWN_HOST_EXCEPTION_STRING + e.getMessage();
+		}
+
 		/**
 		 * Set the error message for the return
 		 * @param errorCode The identifying error code
@@ -412,7 +451,7 @@ public class ServerPost {
 			this.errorCode = errorCode;
 			this.detailErrorMessage = detailErrorMessage;
 		}
-		
+
 		/**
 		 * Set the error of the return value with the given exception.
 		 * @param e the exception
@@ -421,7 +460,7 @@ public class ServerPost {
 			this.errorCode = GENERIC_EXCEPTION;
 			this.detailErrorMessage = e.getMessage();
 		}
-		
+
 		/**
 		 * Return true if we don't have any errors
 		 * @return
@@ -429,7 +468,7 @@ public class ServerPost {
 		final public boolean isSuccess(){
 			return (errorCode == null || errorCode.length() == 0 && isSuccessCustom());
 		}
-		
+
 		/**
 		 * This method must also be true to be considered a success. <br>
 		 * Override this if you want. Default always returns true
@@ -445,7 +484,7 @@ public class ServerPost {
 		public String getDetailErrorMessage(){
 			return detailErrorMessage;
 		}
-		
+
 		/**
 		 * Return the error code of the return
 		 * @return
@@ -467,7 +506,7 @@ public class ServerPost {
 		final public String getServerReturnLastLine(){
 			return serverReturnValueLastLine;
 		}
-		
+
 		/**
 		 * Return the server output as a JSON object. Will be null if we could not convert to a JSON object
 		 * @return
@@ -487,7 +526,7 @@ public class ServerPost {
 			jsonObject = out;
 			return out;
 		}
-		
+
 		/**
 		 * Return the server output as a JSON Array. Will be null if we could not convert to a JSON Array
 		 * @return
@@ -504,7 +543,7 @@ public class ServerPost {
 				Log.e("ServerPost", getServerReturnLastLine());
 				Log.e("ServerPost", Log.getStackTraceString(e));
 			}
-			
+
 			jsonArray = out;
 			return out;
 		}

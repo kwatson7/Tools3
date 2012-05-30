@@ -1101,6 +1101,8 @@ public class Tools {
 			intScale = (int)Math.pow(2, Math.ceil(com.tools.MathTools.log2(scale)));
 		else
 			intScale = (int) Math.ceil(scale);
+		if (intScale < 1)
+			intScale = 1;
 		
 		// now actually do the resizeing
 		BitmapFactory.Options options2 = new BitmapFactory.Options();
