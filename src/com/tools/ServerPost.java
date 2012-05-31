@@ -41,7 +41,7 @@ public class ServerPost {
 	private MultipartEntity multipartEntity; 						// the form post holder
 	private boolean keepFullReturn = false;
 	private int timeoutConnection = 5000; 							// Default to wait for timeout to connect			
-	private int timeoutSocket = 30000; 								// Default length of time to wait for returned data
+	private int timeoutSocket = 90000; 								// Default length of time to wait for returned data
 
 	//enums for file types
 	public enum FileType {
@@ -355,6 +355,7 @@ public class ServerPost {
 		private String errorCode = "";
 		private JSONArray jsonArray = null;
 		private JSONObject jsonObject = null;
+		private boolean isClearStringReturnsOnJsonConversion = true;
 
 		// builtin error codes
 		/**
@@ -524,6 +525,11 @@ public class ServerPost {
 				Log.e("ServerPost", Log.getStackTraceString(e));
 			}
 			jsonObject = out;
+			
+			if (jsonObject != null && isClearStringReturnsOnJsonConversion){
+				serverReturnValue = null;
+				serverReturnValueLastLine = null;
+			}
 			return out;
 		}
 
@@ -545,6 +551,11 @@ public class ServerPost {
 			}
 
 			jsonArray = out;
+			
+			if (jsonArray != null && isClearStringReturnsOnJsonConversion){
+				serverReturnValue = null;
+				serverReturnValueLastLine = null;
+			}
 			return out;
 		}
 	}

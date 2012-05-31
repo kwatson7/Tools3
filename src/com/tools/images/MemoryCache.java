@@ -25,7 +25,7 @@ public class MemoryCache <ID_TYPE> {
      * @param pictureRowId The picture rowId this is linked to
      * @param bitmap The thumbnail bitmap
      */
-    public void putThumbnail(ID_TYPE pictureRowId, Bitmap bitmap){
+    public synchronized void putThumbnail(ID_TYPE pictureRowId, Bitmap bitmap){
     	if (bitmap == null)
     		return;
     	// get the map object
@@ -49,7 +49,7 @@ public class MemoryCache <ID_TYPE> {
      * @param pictureRowId The picture rowId this is linked to
      * @param bitmap The full picture bitmap
      */
-    public void putFullPicture(ID_TYPE pictureRowId, Bitmap bitmap){
+    public synchronized void putFullPicture(ID_TYPE pictureRowId, Bitmap bitmap){
     	if (bitmap == null)
     		return;
     	
@@ -76,7 +76,7 @@ public class MemoryCache <ID_TYPE> {
      * @param thumbnail The thumbnail bitmap
      * @param fullPicture The full picture bitmap
      */
-    public void putPicturesDONTUSE(ID_TYPE pictureRowId, Bitmap thumbnail, Bitmap fullPicture){
+    public synchronized void putPicturesDONTUSE(ID_TYPE pictureRowId, Bitmap thumbnail, Bitmap fullPicture){
         cache.put(pictureRowId, new  TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>>
         	(new SoftReference<Bitmap>(thumbnail), new SoftReference<Bitmap>(fullPicture)));
     }
@@ -84,7 +84,7 @@ public class MemoryCache <ID_TYPE> {
     /**
      * Clear the cache
      */
-    public void clear() {
+    public synchronized void clear() {
     	/*
     	Set<ID_TYPE> keys = cache.keySet();
     	Iterator<ID_TYPE> it = keys.iterator();
@@ -106,7 +106,7 @@ public class MemoryCache <ID_TYPE> {
      * @param pictureRowId the picture rowId
      * @return the thumbnail bitmap stored in this location, or null if none
      */
-    public Bitmap getThumbnail(ID_TYPE pictureRowId){
+    public synchronized Bitmap getThumbnail(ID_TYPE pictureRowId){
     	// if no key, then just return null
     	if (!cache.containsKey(pictureRowId))
     		return null;
@@ -127,7 +127,7 @@ public class MemoryCache <ID_TYPE> {
      * @param pictureRowId the picture rowId
      * @return the full picture bitmap stored in this location, or null if none
      */
-    public Bitmap getFullPicture(ID_TYPE pictureRowId){
+    public synchronized Bitmap getFullPicture(ID_TYPE pictureRowId){
     	// if no key, then just return null
     	if (!cache.containsKey(pictureRowId))
     		return null;
