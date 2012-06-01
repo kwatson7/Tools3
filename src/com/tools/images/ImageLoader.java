@@ -456,7 +456,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
 			// synchronize access to only allow for each picture single access to this block, so as not to allow mutliple grabs of the same file
 			synchronized (bitmapsLoadingLocks.get(photoToLoad.pictureId)) {
-				
+
 				// should we grab the thumbnail first?
 				if (getThumbnailFirst){
 					Bitmap bmp = memoryCache.getThumbnail(photoToLoad.pictureId);

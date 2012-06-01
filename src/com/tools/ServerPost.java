@@ -229,6 +229,7 @@ public class ServerPost {
 		// send post
 		try {
 			// actual send
+			//TODO: can get out of memory error here
 			HttpResponse response = client.execute(httpPost);
 
 			// check what kind of return
