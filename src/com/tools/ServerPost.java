@@ -1,13 +1,21 @@
 package com.tools;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -27,6 +35,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.os.AsyncTask;
 import android.util.Log;
 
 public class ServerPost {
@@ -35,6 +44,7 @@ public class ServerPost {
 	private final Charset ENCODING_TYPE = Charset.forName("UTF-8"); // the type of the data
 	private final int RANDOM_FILENAME_LENGTH = 64; 					// if we create a random filename, the length of the filename
 	private final int GOOD_RETURN_CODE = 200; 						// The return code for a successful sync with server
+	private final int BUFFER_SIZE = 1024; 							// buffer size for downloading files
 
 	// class members
 	private String url; 											// the url to post to
@@ -291,16 +301,16 @@ public class ServerPost {
 
 		// setup background thread and execute
 		PostAsync<ACTIVITY_TYPE> task = 
-				new PostAsync<ACTIVITY_TYPE>(act, callback);
+			new PostAsync<ACTIVITY_TYPE>(act, callback);
 
-				task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
+			task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
 
-					@Override
-					public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
-						callback.onPostFinishedUiThread(activity, result);					
-					}
-				});
-				task.execute();
+				@Override
+				public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
+					callback.onPostFinishedUiThread(activity, result);					
+				}
+			});
+			task.execute();
 	}
 
 	/**
@@ -329,7 +339,138 @@ public class ServerPost {
 
 		@Override
 		protected ServerReturn doInBackground(Void... params) {
-			ServerReturn result= post();
+			ServerReturn result = post();
+			callback.onPostFinished(callingActivity, result);
+			return result;
+		}
+
+		@Override
+		protected void onProgressUpdate(Void... progress) {			
+		}
+
+		@Override
+		protected void onPostExectueOverride(ServerReturn result) {
+			callback.onPostFinishedUiThread(callingActivity, result);
+		}
+
+		@Override
+		protected void setupDialog() {
+		}
+	}
+	
+	/**
+	 * Download a file from the given url
+	 * @param saveFilePath The local path to save the file
+	 * @return True if we downloaded successfully and false otherwise. If false, error logs are written
+	 */
+	private boolean downloadFileHelper(String saveFilePath, AsyncTask task){
+
+		// initialize some variables
+		OutputStream output = null;
+		InputStream input = null;
+
+		// wrap int try catch, so we can perform cleanup
+		try{
+			// make sure the save file path is accessible
+			output = new FileOutputStream(saveFilePath);
+
+			// open the url connection
+			URL url2 = new URL(url);
+			URLConnection connection = url2.openConnection();
+			connection.connect();
+
+			// this will be useful so that you can show a typical 0-100% progress bar
+			int fileLength = connection.getContentLength();
+
+			// download the file
+			input = new BufferedInputStream(url2.openStream());
+
+			// setup for downloading
+			byte data[] = new byte[BUFFER_SIZE];
+			long total = 0;
+			int count;
+
+			// write in buffered increments
+			while ((count = input.read(data)) != -1) {
+				total += count;
+				// publishing the progress....
+				if (task != null)
+					task.publishProgress((int) (total * 100 / fileLength));
+				output.write(data, 0, count);
+			}
+		}catch(FileNotFoundException e){
+			Log.e("ServerPost", Log.getStackTraceString(e));
+			return false;
+		} catch (IOException e) {
+			Log.e("ServerPost", Log.getStackTraceString(e));
+			return false;
+		}finally{
+			// perform cleanup
+			if (output != null){
+				try{ 
+					output.flush();
+				}catch(Exception e){}
+			}
+			if (output != null){
+				try{ 
+					output.close();
+				}catch(Exception e){}
+			}
+			try {
+				if (input != null)
+					input.close();
+			} catch (IOException e) {
+				Log.e("TAG", Log.getStackTraceString(e));
+				return true;
+			}
+		}
+		
+		// successful
+		return true;
+	}
+	
+	/**
+	 * class used to post to server in the background
+	 */
+	private class DownloadFileAsync <ACTIVITY_TYPE extends CustomActivity>
+	extends CustomAsyncTask<ACTIVITY_TYPE, Void, ServerReturn>{
+
+		private GetFileCallback<ACTIVITY_TYPE> callback;
+		private String saveFilePath;
+		private boolean showDialog;
+
+		/**
+		 * Download a file on a backgroudn thread
+		 * @param act The activity to call task
+		 * @param showDialog Should we show a progress dialog?
+		 * @param progressBars Progress bars to update (The string identifiers). Null if none
+		 * @param callback The callback to call when we are done downloading
+		 */
+		private DownloadFileAsync(
+				ACTIVITY_TYPE act,
+				String saveFilePath,
+				boolean showDialog,
+				ArrayList<String> progressBars,
+				final GetFileCallback<ACTIVITY_TYPE> callback) {
+			super(
+					act,
+					-1,
+					false,
+					false,
+					null);
+			this.callback = callback;
+			this.saveFilePath = saveFilePath;
+			this.showDialog = showDialog;
+		}
+
+		@Override
+		protected void onPreExecute() {			
+		}
+
+		@Override
+		protected ServerReturn doInBackground(Void... params) {
+			downloadFileHelper(saveFilePath, callback);
+			ServerReturn result = post();
 			callback.onPostFinished(callingActivity, result);
 			return result;
 		}
@@ -345,6 +486,72 @@ public class ServerPost {
 
 		@Override
 		protected void setupDialog() {
+		}
+		
+		private boolean downloadFileHelper(String saveFilePath){
+
+			// initialize some variables
+			OutputStream output = null;
+			InputStream input = null;
+
+			// wrap int try catch, so we can perform cleanup
+			try{
+				// make sure the save file path is accessible
+				output = new FileOutputStream(saveFilePath);
+
+				// open the url connection
+				URL url2 = new URL(url);
+				URLConnection connection = url2.openConnection();
+				connection.connect();
+
+				// this will be useful so that you can show a typical 0-100% progress bar
+				int fileLength = connection.getContentLength();
+
+				// download the file
+				input = new BufferedInputStream(url2.openStream());
+
+				// setup for downloading
+				byte data[] = new byte[BUFFER_SIZE];
+				long total = 0;
+				int count;
+
+				// write in buffered increments
+				while ((count = input.read(data)) != -1) {
+					total += count;
+					// publishing the progress....
+					if (task != null)
+						task.publishProgress((int) (total * 100 / fileLength));
+					output.write(data, 0, count);
+				}
+			}catch(FileNotFoundException e){
+				Log.e("ServerPost", Log.getStackTraceString(e));
+				return false;
+			} catch (IOException e) {
+				Log.e("ServerPost", Log.getStackTraceString(e));
+				return false;
+			}finally{
+				// perform cleanup
+				if (output != null){
+					try{ 
+						output.flush();
+					}catch(Exception e){}
+				}
+				if (output != null){
+					try{ 
+						output.close();
+					}catch(Exception e){}
+				}
+				try {
+					if (input != null)
+						input.close();
+				} catch (IOException e) {
+					Log.e("TAG", Log.getStackTraceString(e));
+					return true;
+				}
+			}
+			
+			// successful
+			return true;
 		}
 	}
 
@@ -381,13 +588,13 @@ public class ServerPost {
 		 */
 		public static final String UNKNOWN_ERROR_CODE = "UNKNOWN_ERROR_CODE";
 		private static final String UNKNOWN_ERROR_STRING = "Unknown error";
-		
+
 		/**
 		 * Unknown host
 		 */
 		public static final String UNKNOWN_HOST_EXCEPTION = "UNKNOWN_HOST_EXCEPTION";
 		private static final String UNKNOWN_HOST_EXCEPTION_STRING = "Error accessing host. Check internet connection: ";
-		
+
 		/**
 		 * Create a completed server return item
 		 * @param serverReturnValue the entire return from the server
@@ -438,7 +645,7 @@ public class ServerPost {
 			errorCode = IO_EXCEPTION;
 			detailErrorMessage = e.getMessage();
 		}
-		
+
 		private ServerReturn(UnknownHostException e){
 			errorCode = UNKNOWN_HOST_EXCEPTION;
 			detailErrorMessage = UNKNOWN_HOST_EXCEPTION_STRING + e.getMessage();
@@ -526,7 +733,7 @@ public class ServerPost {
 				Log.e("ServerPost", Log.getStackTraceString(e));
 			}
 			jsonObject = out;
-			
+
 			if (jsonObject != null && isClearStringReturnsOnJsonConversion){
 				serverReturnValue = null;
 				serverReturnValueLastLine = null;
@@ -552,7 +759,7 @@ public class ServerPost {
 			}
 
 			jsonArray = out;
-			
+
 			if (jsonArray != null && isClearStringReturnsOnJsonConversion){
 				serverReturnValue = null;
 				serverReturnValueLastLine = null;
@@ -575,5 +782,9 @@ public class ServerPost {
 		 * @param result The server result
 		 */
 		public void onPostFinishedUiThread(ACTIVITY_TYPE act, ServerReturn result);
+	}
+	
+	public interface GetFileCallback <ACTIVITY_TYPE extends CustomActivity>{
+		
 	}
 }
