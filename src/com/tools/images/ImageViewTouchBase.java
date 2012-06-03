@@ -97,8 +97,6 @@ implements IDisposable {
 
 	public void setImageRotateBitmapReset( final RotateBitmap bitmap, final boolean reset )
 	{
-		Log.d( LOG_TAG, "setImageRotateBitmapReset" );
-
 		final int viewWidth = getWidth();
 		if ( viewWidth <= 0 ) {
 			mOnLayoutRunnable = new Runnable() {

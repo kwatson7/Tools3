@@ -1,21 +1,13 @@
 package com.tools;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.net.URL;
-import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -35,7 +27,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.os.AsyncTask;
 import android.util.Log;
 
 public class ServerPost {

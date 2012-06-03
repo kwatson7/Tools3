@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.ref.SoftReference;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 			Collections.synchronizedMap(new WeakHashMap<ImageView, ID_TYPE>()); // keeps track of links between views and pictures	
 	private ExecutorService executorService;  								// run the threads
 	private final int stub_id;	 											// The resource id of the default image
+	
 	private final int desiredWidth; 										// The desired width of full size image
 	private final int desiredHeight; 										// The desired screen height of full size iamge
 	private final boolean showFullImage; 									// boolean to display full image or just thumbnail
@@ -48,6 +50,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	 * @param desiredWidth The max desired width of the full size image on screen
 	 * @param desiredHeight The max desired height of the full size image on screen
 	 * @param showFullImage Boolean to display full sized image, or just thumbnail.
+	 * @param loadImage callback used to load the bitmaps
 	 */
 	public ImageLoader(
 			int defaultImageId,
@@ -62,177 +65,6 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		this.desiredWidth = desiredWidth;
 		this.showFullImage = showFullImage;
 		this.loadImageCallback = loadImage;
-	}
-
-	/**
-	 * Used to grab bitmap data for generic identifiers of thumbnail and full pictures.
-	 * See static methods in ImageLoader for helpful methods for loading images
-	 * @author Kyle
-	 *
-	 * @param <THUMBNAIL_TYPE>
-	 * @param <FULL_IMAGE_TYPE>
-	 */
-	public interface LoadImage <THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
-		/**
-		 * Load in a thumbnail. This should be a small picture that loads quickly and ideally does not require resizing
-		 * @param thumbnailData The data needed to get the picture
-		 * @return The bitmap, or null if unsuccessful
-		 */
-		public Bitmap onThumbnailLocal(THUMBNAIL_TYPE thumbnailData);
-		/**
-		 * Load in a thumbnail from the web if thumbnailLocal return null. <br>
-		 * This should be a small picture that loads quickly and ideally does not require resizing
-		 * @param thumbnailData The data needed to get the picture
-		 * @return The bitmap, or null if unsuccessful
-		 */
-		public Bitmap onThumbnailWeb(THUMBNAIL_TYPE thumbnailData);
-		/**
-		 * Load in a full size picture. This will load after the thumbnail has loaded. It should be a high def image
-		 * @param fullSizeData The data needed to get the picture
-		 * @param desiredWidth The max width this image should be to avoid memory errors
-		 * @param desiredHeight The max height this image should be to avoid memory errors
-		 * @return The bitmap, or null if unsuccessful
-		 */
-		public Bitmap onFullSizeLocal(FULL_IMAGE_TYPE fullSizeData, int desiredWidth, int desiredHeight);
-		/**
-		 * Load in a full size picture from the web only if onFullSizeLocal returns null. This will load after the thumbnail has loaded. It should be a high def image
-		 * @param fullSizeData The data needed to get the picture
-		 * @param desiredWidth The max width this image should be to avoid memory errors
-		 * @param desiredHeight The max height this image should be to avoid memory errors
-		 * @return The bitmap, or null if unsuccessful
-		 */
-		public Bitmap onFullSizeWeb(FULL_IMAGE_TYPE fullSizeData, int desiredWidth, int desiredHeight);
-		/**
-		 * Create thumbnail data from the full sized image. This is only called if the thumbnail data is missing.<br>
-		 * This is not required.
-		 * @param thumbnailData
-		 * @param fullSizeData
-		 */
-		public void createThumbnailFromFull(THUMBNAIL_TYPE thumbnailData, FULL_IMAGE_TYPE fullSizeData);
-	}
-
-	/**
-	 * Launch async runnable to show this image
-	 * @param pictureRowId 	The picture rowId
-	 * @param thumbnailPath The thumbnail path
-	 * @param fullPicturePath The full file image path
-	 * @param imageView The imageView to put the image
-	 */
-	public void DisplayImage(
-			ID_TYPE pictureRowId,
-			THUMBNAIL_TYPE thumbnail,
-			FULL_IMAGE_TYPE fullPictuure,
-			ImageView imageView)
-	{
-
-		// create the object containing all the relevant data
-		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data =
-				new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
-						pictureRowId,
-						thumbnail,
-						fullPictuure,
-						imageView);
-
-				// store the links
-				imageViews.put(imageView, pictureRowId);
-
-				// attempt to access cached full picture
-				Bitmap bitmap = null;
-				if (showFullImage)
-					bitmap = memoryCache.getFullPicture(pictureRowId);
-
-				// no full picture, so queue the photo loader, and check for thumbnail
-				if (bitmap == null){
-					bitmap = memoryCache.getThumbnail(pictureRowId);
-					if (bitmap == null)
-						queuePhoto(data, true);
-					else if (showFullImage)
-						queuePhoto(data, false);
-				}
-
-				// see if we have a bitmap to access
-				if(bitmap!=null)
-					imageView.setImageBitmap(bitmap);
-
-				// otherwise just show the default image
-				else
-					imageView.setImageResource(stub_id);
-	}
-
-	/**
-	 * Add this photo to the download queue
-	 * @param url The url of the file to download
-	 * @param imageView The imageView to put the bitmap
-	 * @param getThumbnailFirst should we get thumbnail first (true), or do we only need the full picture (false)
-	 */
-	private void queuePhoto(PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data, boolean getThumbnailFirst)
-	{
-		if (executorService != null)
-			executorService.submit(new PhotosLoader(data, getThumbnailFirst, showFullImage));
-	}
-
-	/**
-	 * Read a picture from the given byte[], return null if unsuffessful <br>
-	 * Make sure to NOT call on main UI thread because it's slow <br>
-	 * Will be properly rotated based on exif data stored in image
-	 * @param inputData the byte array
-	 * @param angle the rotation angle to rotate the data
-	 * @return the bitmap
-	 */
-	public static Bitmap getThumbnail(
-			byte[] inputData,
-			float angle){
-		// open the path if it exists
-		if (inputData != null && inputData.length != 0){
-
-			// read the bitmap
-			Bitmap bmp = BitmapFactory.decodeByteArray(inputData, 0, inputData.length);
-			if (bmp == null)
-				return bmp;
-
-			// now do the rotation
-			if (angle != 0) {
-				Matrix matrix = new Matrix();
-				matrix.postRotate(angle);
-
-				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
-						bmp.getHeight(), matrix, true);
-			}
-			return bmp;
-		}
-		else	
-			return null;
-	}
-
-	/**
-	 * Read a picture from the given path, return null if unsuffessful <br>
-	 * Make sure to NOT call on main UI thread because it's slow <br>
-	 * Will be properly rotated based on exif data stored in image
-	 * @param path
-	 * @return the bitmap
-	 */
-	public static Bitmap getThumbnail(String path){
-		// open the path if it exists
-		if (path != null && path.length() != 0 && (new File(path)).exists()){
-
-			// read the bitmap
-			Bitmap bmp = BitmapFactory.decodeFile(path);
-			if (bmp == null)
-				return bmp;
-
-			// now do the rotation
-			float angle =  com.tools.Tools.getExifOrientationAngle(path);
-			if (angle != 0) {
-				Matrix matrix = new Matrix();
-				matrix.postRotate(angle);
-
-				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
-						bmp.getHeight(), matrix, true);
-			}
-			return bmp;
-		}
-		else	
-			return null;
 	}
 
 	/**
@@ -409,22 +241,270 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		}
 	}
 
-	//Task for the queue
-	private static class PhotoToLoad <ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>
+	/**
+	 * Read a picture from the given byte[], return null if unsuffessful <br>
+	 * Make sure to NOT call on main UI thread because it's slow <br>
+	 * Will be properly rotated based on exif data stored in image
+	 * @param inputData the byte array
+	 * @param angle the rotation angle to rotate the data
+	 * @return the bitmap
+	 */
+	public static Bitmap getThumbnail(
+			byte[] inputData,
+			float angle){
+		// open the path if it exists
+		if (inputData != null && inputData.length != 0){
+
+			// read the bitmap
+			Bitmap bmp = BitmapFactory.decodeByteArray(inputData, 0, inputData.length);
+			if (bmp == null)
+				return bmp;
+
+			// now do the rotation
+			if (angle != 0) {
+				Matrix matrix = new Matrix();
+				matrix.postRotate(angle);
+
+				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+						bmp.getHeight(), matrix, true);
+			}
+			return bmp;
+		}
+		else	
+			return null;
+	}
+
+	/**
+	 * Read a picture from the given path, return null if unsuffessful <br>
+	 * Make sure to NOT call on main UI thread because it's slow <br>
+	 * Will be properly rotated based on exif data stored in image
+	 * @param path
+	 * @return the bitmap
+	 */
+	public static Bitmap getThumbnail(String path){
+		// open the path if it exists
+		if (path != null && path.length() != 0 && (new File(path)).exists()){
+
+			// read the bitmap
+			Bitmap bmp = BitmapFactory.decodeFile(path);
+			if (bmp == null)
+				return bmp;
+
+			// now do the rotation
+			float angle =  com.tools.Tools.getExifOrientationAngle(path);
+			if (angle != 0) {
+				Matrix matrix = new Matrix();
+				matrix.postRotate(angle);
+
+				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+						bmp.getHeight(), matrix, true);
+			}
+			return bmp;
+		}
+		else	
+			return null;
+	}
+
+	/**
+	 * Clear the cache and reset didWeReceivedOomError
+	 */
+	public void clearCache() {
+		memoryCache.clear();
+	}
+
+	/**
+	 * Clear memory if we don't have enough space available
+	 */
+	public synchronized void clearCacheIfNeeded(){
+		if(Runtime.getRuntime().freeMemory() < REQUIRED_BYTES)
+			clearCache();
+	}
+
+	/**
+	 * Launch async runnable to show this image
+	 * @param pictureRowId 	The picture rowId
+	 * @param thumbnail The data required to find / create the thumbnail
+	 * @param fullPictuure The data required to find / create the full image
+	 * @param imageView The imageView to put the image
+	 */
+	public void DisplayImage(
+			ID_TYPE pictureRowId,
+			THUMBNAIL_TYPE thumbnail,
+			FULL_IMAGE_TYPE fullPictuure,
+			ImageView imageView)
 	{
-		public THUMBNAIL_TYPE thumbnail;
-		public FULL_IMAGE_TYPE fullPicture;
-		public ImageView imageView;
-		public ID_TYPE pictureId;
-		public PhotoToLoad(
-				ID_TYPE pictureId,
-				THUMBNAIL_TYPE thumbnail,
-				FULL_IMAGE_TYPE fullPicture,
-				ImageView image){
-			this.thumbnail = thumbnail;
-			this.fullPicture = fullPicture;
-			this.pictureId = pictureId;
-			imageView = image;
+
+		// create the object containing all the relevant data
+		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data =
+				new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
+						pictureRowId,
+						thumbnail,
+						fullPictuure,
+						imageView);
+
+				// store the links
+				imageViews.put(imageView, pictureRowId);
+
+				// attempt to access cached full picture
+				Bitmap bitmap = null;
+				if (showFullImage)
+					bitmap = memoryCache.getFullPicture(pictureRowId);
+
+				// no full picture, so queue the photo loader, and check for thumbnail
+				if (bitmap == null){
+					bitmap = memoryCache.getThumbnail(pictureRowId);
+					if (bitmap == null)
+						queuePhoto(data, true);
+					else if (showFullImage)
+						queuePhoto(data, false);
+				}
+
+				// see if we have a bitmap to access
+				if(bitmap!=null)
+					imageView.setImageBitmap(bitmap);
+
+				// otherwise just show the default image
+				else
+					imageView.setImageResource(stub_id);
+	}
+
+	/**
+	 * Return the memory cache.<br>
+	 * **** This should only be used when storing this memory cache to be passed into again useing restoreMemoryCache
+	 * for example on orientation changes *****
+	 * @return
+	 */
+	public MemoryCache<ID_TYPE> getMemoryCache(){
+		return memoryCache;
+	}
+
+	/**
+	 * Restart running threads. Usually call this on activity onResume();
+	 * If threads already running, null operation.
+	 */
+	public void restartThreads(){
+		if (executorService == null)
+			executorService=Executors.newFixedThreadPool(MAX_THREADS);
+	}
+
+	/**
+	 * Set the memory cache to this new value, clearing old one.
+	 * @see getMemoryCache.
+	 * @param mem
+	 */
+	public void restoreMemoryCache(MemoryCache<ID_TYPE> mem){
+		if (memoryCache != null)
+			memoryCache.clear();
+		memoryCache = mem;
+	}
+
+	/**
+	 * Stop background threads, usually call this on activity onPause
+	 */
+	public void stopThreads(){
+		if (executorService != null)
+			executorService.shutdown();
+		executorService = null;
+	}
+
+	/**
+	 * Add this photo to the download queue
+	 * @param url The url of the file to download
+	 * @param imageView The imageView to put the bitmap
+	 * @param getThumbnailFirst should we get thumbnail first (true), or do we only need the full picture (false)
+	 */
+	private void queuePhoto(PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data, boolean getThumbnailFirst)
+	{
+		if (executorService != null)
+			executorService.submit(new PhotosLoader(data, getThumbnailFirst, showFullImage));
+	}
+
+	/**
+	 * Check if this imageView is being re-used
+	 * @param photoToLoad
+	 * @return boolean if true
+	 */
+	boolean imageViewReused(PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> photoToLoad){
+		ImageView image = photoToLoad.imageViewSoftReference.get();
+		if (image == null)
+			return true;
+		ID_TYPE rowId = imageViews.get(image);
+		if(rowId==null || !photoToLoad.pictureId.equals(rowId))
+			return true;
+		return false;
+	}
+
+	/**
+	 * Used to grab bitmap data for generic identifiers of thumbnail and full pictures.
+	 * See static methods in ImageLoader for helpful methods for loading images
+	 * @author Kyle
+	 *
+	 * @param <THUMBNAIL_TYPE>
+	 * @param <FULL_IMAGE_TYPE>
+	 */
+	public interface LoadImage <THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
+		/**
+		 * Create thumbnail data from the full sized image. This is only called if the thumbnail data is missing.<br>
+		 * This is not required.
+		 * @param thumbnailData
+		 * @param fullSizeData
+		 */
+		public void createThumbnailFromFull(THUMBNAIL_TYPE thumbnailData, FULL_IMAGE_TYPE fullSizeData);
+		/**
+		 * Load in a full size picture. This will load after the thumbnail has loaded. It should be a high def image
+		 * @param fullSizeData The data needed to get the picture
+		 * @param desiredWidth The max width this image should be to avoid memory errors
+		 * @param desiredHeight The max height this image should be to avoid memory errors
+		 * @return The bitmap, or null if unsuccessful
+		 */
+		public Bitmap onFullSizeLocal(FULL_IMAGE_TYPE fullSizeData, int desiredWidth, int desiredHeight);
+		/**
+		 * Load in a full size picture from the web only if onFullSizeLocal returns null. This will load after the thumbnail has loaded. It should be a high def image
+		 * @param fullSizeData The data needed to get the picture
+		 * @param desiredWidth The max width this image should be to avoid memory errors
+		 * @param desiredHeight The max height this image should be to avoid memory errors
+		 * @return The bitmap, or null if unsuccessful
+		 */
+		public Bitmap onFullSizeWeb(FULL_IMAGE_TYPE fullSizeData, int desiredWidth, int desiredHeight);
+		/**
+		 * Load in a thumbnail. This should be a small picture that loads quickly and ideally does not require resizing
+		 * @param thumbnailData The data needed to get the picture
+		 * @return The bitmap, or null if unsuccessful
+		 */
+		public Bitmap onThumbnailLocal(THUMBNAIL_TYPE thumbnailData);
+		/**
+		 * Load in a thumbnail from the web if thumbnailLocal return null. <br>
+		 * This should be a small picture that loads quickly and ideally does not require resizing
+		 * @param thumbnailData The data needed to get the picture
+		 * @return The bitmap, or null if unsuccessful
+		 */
+		public Bitmap onThumbnailWeb(THUMBNAIL_TYPE thumbnailData);
+	}
+
+	//Used to display bitmap in the UI thread
+	private class BitmapDisplayer
+	implements Runnable
+	{
+		Bitmap bitmap;
+		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> photoToLoad;
+		public BitmapDisplayer(
+				Bitmap b,
+				PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> p){
+
+			bitmap=b;
+			photoToLoad=p;
+		}
+		public void run()
+		{
+			if(imageViewReused(photoToLoad))
+				return;
+			ImageView image = photoToLoad.imageViewSoftReference.get();
+			if (image == null)
+				return;
+			if(bitmap!=null)
+				image.setImageBitmap(bitmap);
+			else
+				image.setImageResource(stub_id);
 		}
 	}
 
@@ -476,8 +556,11 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 					// load the bitmap on the ui thread
 					if (bmp != null){
 						BitmapDisplayer bd = new BitmapDisplayer(bmp, photoToLoad);
-						Activity a=(Activity)photoToLoad.imageView.getContext();
-						a.runOnUiThread(bd);
+						ImageView image = photoToLoad.imageViewSoftReference.get();
+						if (image != null){
+							Activity a=(Activity)image.getContext();
+							a.runOnUiThread(bd);
+						}
 					}
 				}
 
@@ -499,101 +582,33 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 					// load the bitmap on the ui thread
 					if (fullBmp != null){
 						BitmapDisplayer bd = new BitmapDisplayer(fullBmp, photoToLoad);
-						Activity a=(Activity)photoToLoad.imageView.getContext();
-						a.runOnUiThread(bd);
+						ImageView image = photoToLoad.imageViewSoftReference.get();
+						if (image != null){
+							Activity a=(Activity)image.getContext();
+							a.runOnUiThread(bd);
+						}
 					}
 				}
 			}
 		}
 	}
 
-	/**
-	 * Clear memory if we don't have enough space available
-	 */
-	public synchronized void clearCacheIfNeeded(){
-		if(Runtime.getRuntime().freeMemory() < REQUIRED_BYTES)
-			clearCache();
-	}
-
-	/**
-	 * Check if this imageView is being re-used
-	 * @param photoToLoad
-	 * @return boolean if true
-	 */
-	boolean imageViewReused(PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> photoToLoad){
-		ID_TYPE rowId = imageViews.get(photoToLoad.imageView);
-		if(rowId==null || !photoToLoad.pictureId.equals(rowId))
-			return true;
-		return false;
-	}
-
-	//Used to display bitmap in the UI thread
-	private class BitmapDisplayer
-	implements Runnable
+	//Task for the queue
+	private static class PhotoToLoad <ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>
 	{
-		Bitmap bitmap;
-		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> photoToLoad;
-		public BitmapDisplayer(
-				Bitmap b,
-				PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> p){
-
-			bitmap=b;
-			photoToLoad=p;
+		public THUMBNAIL_TYPE thumbnail;
+		public FULL_IMAGE_TYPE fullPicture;
+		public SoftReference<ImageView> imageViewSoftReference;
+		public ID_TYPE pictureId;
+		public PhotoToLoad(
+				ID_TYPE pictureId,
+				THUMBNAIL_TYPE thumbnail,
+				FULL_IMAGE_TYPE fullPicture,
+				ImageView image){
+			this.thumbnail = thumbnail;
+			this.fullPicture = fullPicture;
+			this.pictureId = pictureId;
+			imageViewSoftReference = new SoftReference<ImageView>(image);
 		}
-		public void run()
-		{
-			if(imageViewReused(photoToLoad))
-				return;
-			if(bitmap!=null)
-				photoToLoad.imageView.setImageBitmap(bitmap);
-			else
-				photoToLoad.imageView.setImageResource(stub_id);
-		}
-	}
-
-	/**
-	 * Clear the cache and reset didWeReceivedOomError
-	 */
-	public void clearCache() {
-		memoryCache.clear();
-	}
-
-	/**
-	 * Stop background threads, usually call this on activity onPause
-	 */
-	public void stopThreads(){
-		if (executorService != null)
-			executorService.shutdown();
-		executorService = null;
-	}
-
-	/**
-	 * Restart running threads. Usually call this on activity onResume();
-	 * If threads already running, null operation.
-	 */
-	public void restartThreads(){
-		if (executorService == null)
-			executorService=Executors.newFixedThreadPool(MAX_THREADS);
-	}
-
-	/**
-	 * Return the memory cache.<br>
-	 * **** This should only be used when storing this memory cache to be passed into again useing restoreMemoryCache
-	 * for example on orientation changes *****
-	 * @return
-	 */
-	public MemoryCache<ID_TYPE> getMemoryCache(){
-		return memoryCache;
-	}
-
-	/**
-	 * Set the memory cache to this new value, clearing old one.
-	 * @see getMemoryCache.
-	 * @param mem
-	 */
-	public void restoreMemoryCache(MemoryCache<ID_TYPE> mem){
-		if (memoryCache != null)
-			memoryCache.clear();
-		memoryCache = mem;
 	}
 }
