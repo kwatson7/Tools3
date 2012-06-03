@@ -8,6 +8,7 @@ import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.AsyncTask;
+import android.util.Log;
 import android.widget.ProgressBar;
 
 /**
@@ -236,11 +237,39 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 								bar.setVisibility(ProgressBar.GONE);
 						}
 					}catch (Exception e){
-						
+						Log.e("CustomAsyncTask", Log.getStackTraceString(e));
 					}
 				}
 			}
 		}
+	}
+	
+	/**
+	 * Get the progress bar at the given index (if we input an array of progressbar identifiers). 
+	 * This will always grab a progress bar from the current activity.
+	 * @param i The index to grab
+	 * @return The progressbar or null if none could be found.
+	 */
+	protected ProgressBar getProgressBar(int i){
+		// make sure we have an activity and progress bars
+		if (callingActivity == null || progressBars == null)
+			return null;
+		
+		// initialize output
+		ProgressBar bar = null;
+		
+		// try to grab the id
+		try{
+			String item = progressBars.get(i);
+			int id = callingActivity.getResources().getIdentifier(item, "id", callingActivity.getPackageName());
+			if (id != 0){
+				bar = (ProgressBar) callingActivity.findViewById(id);
+			}
+		}catch (Exception e){
+			Log.e("CustomAsyncTask", Log.getStackTraceString(e));
+		}
+		
+		return bar;
 	}
 	
 	/**
