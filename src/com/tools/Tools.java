@@ -14,6 +14,8 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -57,7 +59,7 @@ import android.widget.Toast;
  *
  */
 public class Tools {
-//TODO: class not commented
+	//TODO: class not commented
 	// static variables for use in methods
 	/** SMS field to be inserted as a received message */
 	public static final int MESSAGE_TYPE_INBOX = 1; 
@@ -374,7 +376,7 @@ public class Tools {
 	 * @param newWidthHeight New desired width and height
 	 * @param orientationAngle Float for the orientation of the byte array. If the data
 	 * is already stored in the byte array, then pass null and the value will be extracted.
-     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
+	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
 	 * @throws IllegalArgumentException if cropFlag is not the right input type
 	 */
 	public static byte[] resizeByteArray(byte[] input, 
@@ -382,7 +384,7 @@ public class Tools {
 			String cropFlag, 
 			Context ctx, 
 			Float orientationAngle,
-            int imageQuality) 
+			int imageQuality) 
 	throws IllegalArgumentException{
 
 		// grab orientation angle from exif data
@@ -502,14 +504,14 @@ public class Tools {
 	 * @param ctx Context context, usually getApplicationContext
 	 * @param orientationAngle Float for the orientation of the byte array. If the data
 	 * is already stored in the byte array, then pass null and the value will be extracted.
-     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
+	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
 	 * @throws IllegalArgumentException if cropFlag is not the right input type
 	 */
 	public static byte[] rotateByteArray(
 			byte[] input, 
 			Context ctx, 
 			Float orientationAngle,
-            int imageQuality){
+			int imageQuality){
 
 		// grab orientation angle from exif data
 		if (orientationAngle == null)
@@ -1020,7 +1022,7 @@ public class Tools {
 		}
 		folder.delete();
 	}
-	
+
 	/**
 	 * Parse an arraylist into a list separated by the input delim.
 	 * @param array the array to put into a string
@@ -1050,19 +1052,19 @@ public class Tools {
 	public static ArrayList<String> setArrayFromString(String listString, String delim){
 		if (listString == null)
 			return new ArrayList<String>(0);
-		
+
 		// break up string by commas
 		String[] tokens = listString.split(delim);
 		ArrayList<String> array = new ArrayList<String>(tokens.length);
-		
+
 		// fill array
 		for (int i = 0; i < tokens.length; i++){
 			array.add(tokens[i]);
 		}
-		
+
 		return array;
 	}
-	
+
 	/**
 	 * Create a byte array thumbnail from the input image byte array. <br>
 	 * Will take into account the exifOrientation, but can only handle rotations, not transposing or inversions. <br>
@@ -1076,7 +1078,7 @@ public class Tools {
 	 * @param maxThumbnailDimension The maximum thumbnail dimension in either height or width
 	 * @param forceBase2 If we force to downsample by base2, it is faster, but then we can only
 	 * resize by a factor of 2,4,8,16...
-     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
+	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
 	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL
 	 */
 	public static byte[] makeThumbnail(
@@ -1084,17 +1086,17 @@ public class Tools {
 			int exifOrientation,
 			final int maxThumbnailDimension,
 			boolean forceBase2,
-            int imageQuality){
-			
+			int imageQuality){
+
 		if (imageData == null || imageData.length == 0)
 			return null;
-		
+
 		// determine the size of the image first, so we know at what sample rate to use.
 		BitmapFactory.Options options=new BitmapFactory.Options();
 		options.inJustDecodeBounds = true;
 		BitmapFactory.decodeByteArray(imageData, 0, imageData.length, options);
 		double scale = ((double)Math.max(options.outHeight, options.outWidth))/maxThumbnailDimension;
-		
+
 		// convert to integer scaling ratio to base 2 or not depending on input
 		int intScale = 1;
 		if (forceBase2)
@@ -1103,12 +1105,12 @@ public class Tools {
 			intScale = (int) Math.ceil(scale);
 		if (intScale < 1)
 			intScale = 1;
-		
+
 		// now actually do the resizeing
 		BitmapFactory.Options options2 = new BitmapFactory.Options();
 		options2.inSampleSize = intScale;
 		Bitmap thumbnailBitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.length, options2);
-		
+
 		// determine the rotation angle
 		int angle = 0;
 		switch (exifOrientation){
@@ -1125,25 +1127,25 @@ public class Tools {
 			angle = 270;
 			break;
 		}
-		
+
 		// now do the rotation
 		if (angle != 0) {
-	        Matrix matrix = new Matrix();
-	        matrix.postRotate(angle);
+			Matrix matrix = new Matrix();
+			matrix.postRotate(angle);
 
-	        thumbnailBitmap = Bitmap.createBitmap(thumbnailBitmap, 0, 0, thumbnailBitmap.getWidth(),
-	        		thumbnailBitmap.getHeight(), matrix, true);
-	    }
-		
+			thumbnailBitmap = Bitmap.createBitmap(thumbnailBitmap, 0, 0, thumbnailBitmap.getWidth(),
+					thumbnailBitmap.getHeight(), matrix, true);
+		}
+
 		// convert back to byte array.
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();  
 		thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, baos);
 		byte[] byteArray = baos.toByteArray();
-		
+
 		// return result
 		return byteArray;
 	}
-	
+
 	/**
 	 * Generate a random string using 0-9, and a-v
 	 * @param nCharacters The number of characters to create
@@ -1153,7 +1155,7 @@ public class Tools {
 		SecureRandom random = new SecureRandom();
 		return new BigInteger(nCharacters*5, random).toString(32);
 	}
-	
+
 	/**
 	 * Post a notification to the notification bar
 	 * @param act The calling activity
@@ -1193,7 +1195,7 @@ public class Tools {
 		//Pass the Notification to the NotificationManager:
 		mNotificationManager.notify(notificationId, notification);
 	}
-	
+
 	/**
 	 * Rotate the exif data in a picture by 90 degrees.
 	 * @param filePath The path of the file
@@ -1201,11 +1203,11 @@ public class Tools {
 	 * @throws IOException 
 	 */
 	public static void rotateExif(String fileName, int direction){
-		
+
 		// 0 rotation
 		if (direction == 0)
 			return;
-		
+
 		ExifInterface EI;
 		try {
 			EI = new ExifInterface(fileName);
@@ -1213,21 +1215,21 @@ public class Tools {
 			e1.printStackTrace();
 			return;
 		}
-		
+
 		// get the angle
 		float angle = getExifOrientationAngle(fileName);
-		
+
 		// rotate the angle
 		if (direction < 0)
 			angle = angle - 90;
 		else
 			angle = angle + 90;
-		
+
 		// modulate by 360
 		while (angle < 0)
 			angle += 360;
 		angle = angle % 360;
-		
+
 		// determine the rotation angle
 		int exifOrientation = ExifInterface.ORIENTATION_UNDEFINED;
 		switch ((int)angle){
@@ -1244,7 +1246,7 @@ public class Tools {
 			exifOrientation = ExifInterface.ORIENTATION_ROTATE_270;
 			break;
 		}
-		
+
 		EI.setAttribute(ExifInterface.TAG_ORIENTATION, ""+exifOrientation);
 		try {
 			EI.saveAttributes();
@@ -1253,7 +1255,7 @@ public class Tools {
 			return;
 		}
 	}
-	
+
 	/**
 	 * Share a picture with a sharing intent
 	 * @param ctx The context required to start the intent
@@ -1267,140 +1269,140 @@ public class Tools {
 		// if any values are null, then return false
 		if (ctx == null || subject == null || body == null || prompt == null || fileName == null || fileName.length() == 0)
 			return false;
-		
+
 		// grab the file
 		File file = new File(fileName);
-		
+
 		// if no exist, then return false
 		if (!file.exists())
 			return false;
-		
+
 		// create the intent
 		Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
-		
+
 		// set the type
 		sharingIntent.setType("image/jpeg");
-		
+
 		// create and load the message and subject
 		sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
 		sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, body);
-		
+
 		// put picture in intent
 		sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
-		
+
 		// launch the intent
 		ctx.startActivity(Intent.createChooser(sharingIntent, prompt));
-		
+
 		// return true
 		return true;
 	}
-	
-	/**
-     * Try to create the thumbnail from the full picture reading any exif data.
-     * @param fullFile the path to the full file
-     * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
-     * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
-     * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
-     * @return the bitmap, or null if any errors occured
-     */
-    public static Bitmap getThumbnail(
-    		String fullFile,
-    		int maxPixelSize,
-    		boolean forceBase2,
-            int imageQuality){
-    	
-    	// open the full file
-    	if (fullFile == null || fullFile.length() == 0)
-    		return null;
-    	RandomAccessFile f = null;
-    	try{
-    		f = new RandomAccessFile(fullFile, "r");
-    	}catch (FileNotFoundException  e){
-    		return null;
-    	}
-    	
-    	// read the file data
-    	byte[] b = null;
-    	ExifInterface exif = null;
-    	try{
-    		b = new byte[(int)f.length()];
-    		f.read(b);
-    		f.close();
-    		
-    		// read the orientaion
-   		 	exif = new ExifInterface(fullFile);
-    	}catch(IOException e){
-    		e.printStackTrace();
-    		return null;
-    	}
 
-    	// grab the rotation
+	/**
+	 * Try to create the thumbnail from the full picture reading any exif data.
+	 * @param fullFile the path to the full file
+	 * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
+	 * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
+	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
+	 * @return the bitmap, or null if any errors occured
+	 */
+	public static Bitmap getThumbnail(
+			String fullFile,
+			int maxPixelSize,
+			boolean forceBase2,
+			int imageQuality){
+
+		// open the full file
+		if (fullFile == null || fullFile.length() == 0)
+			return null;
+		RandomAccessFile f = null;
+		try{
+			f = new RandomAccessFile(fullFile, "r");
+		}catch (FileNotFoundException  e){
+			return null;
+		}
+
+		// read the file data
+		byte[] b = null;
+		ExifInterface exif = null;
+		try{
+			b = new byte[(int)f.length()];
+			f.read(b);
+			f.close();
+
+			// read the orientaion
+			exif = new ExifInterface(fullFile);
+		}catch(IOException e){
+			e.printStackTrace();
+			return null;
+		}
+
+		// grab the rotation
 		int rotation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 
 				ExifInterface.ORIENTATION_UNDEFINED);
-		
+
 		// create the byte array
 		byte[] thumbnail = com.tools.Tools.makeThumbnail(
 				b,
 				rotation,
 				maxPixelSize,
 				forceBase2,
-                imageQuality);
-		
+				imageQuality);
+
 		if (thumbnail == null)
 			return null;
-		
+
 		// convert to bitmap
 		return BitmapFactory.decodeByteArray(thumbnail, 0, thumbnail.length);
 	}
-    
-    /**
-     * Read a file into a byte[]. Output will be null if file cannot be read
-     * @param fileName the file to read
-     * @return the byte[] of the file
-     */
-    public static byte[] readFile(String fileName){
-    	// open the full file
-    	if (fileName == null || fileName.length() == 0)
-    		return null;
-    	RandomAccessFile f = null;
-    	try{
-    		f = new RandomAccessFile(fileName, "r");
-    	}catch (FileNotFoundException  e){
-    		return null;
-    	}
-    	
-    	// read the file data
-    	byte[] b = null;
-    	try{
-    		b = new byte[(int)f.length()];
-    		f.read(b);
-    		f.close();
-    	}catch(IOException e){
-    		Log.e("com.tools.Tools", Log.getStackTraceString(e));
-    		return null;
-    	}
 
-    	return b;
-    }
-    
-    /**
-     * Save the view and all its children to a bitmap <br>
-     * @param view the view to save
-     * @param viewsToHide a list of views to hide before creating the bitmap, null is acceptabl
-     * @param viewToTakeFocus allow for the given view to take focus. Null is accetpable
-     * This is helpful, because if you selected a button to trigger this method, the button will be highlighted
-     * A layout view is a usually a good choice
-     * @param nullColor the color to ignore and to only extract the center region, for example to chop the black edges
-     * enter Color.rgb(0, 0, 0); Enter null to ignore
-     * @return the bitmap created, null if error occured
-     */
-    public static Bitmap saveViewToBitmap(View view, ArrayList<View> viewsToHide, View viewToTakeFocus, Integer nullColor){
-		
-    	if (view == null){
-    		Log.e("com.tools", "null view was input");
-    		return null;
-    	}
-    	
+	/**
+	 * Read a file into a byte[]. Output will be null if file cannot be read
+	 * @param fileName the file to read
+	 * @return the byte[] of the file
+	 */
+	public static byte[] readFile(String fileName){
+		// open the full file
+		if (fileName == null || fileName.length() == 0)
+			return null;
+		RandomAccessFile f = null;
+		try{
+			f = new RandomAccessFile(fileName, "r");
+		}catch (FileNotFoundException  e){
+			return null;
+		}
+
+		// read the file data
+		byte[] b = null;
+		try{
+			b = new byte[(int)f.length()];
+			f.read(b);
+			f.close();
+		}catch(IOException e){
+			Log.e("com.tools.Tools", Log.getStackTraceString(e));
+			return null;
+		}
+
+		return b;
+	}
+
+	/**
+	 * Save the view and all its children to a bitmap <br>
+	 * @param view the view to save
+	 * @param viewsToHide a list of views to hide before creating the bitmap, null is acceptabl
+	 * @param viewToTakeFocus allow for the given view to take focus. Null is accetpable
+	 * This is helpful, because if you selected a button to trigger this method, the button will be highlighted
+	 * A layout view is a usually a good choice
+	 * @param nullColor the color to ignore and to only extract the center region, for example to chop the black edges
+	 * enter Color.rgb(0, 0, 0); Enter null to ignore
+	 * @return the bitmap created, null if error occured
+	 */
+	public static Bitmap saveViewToBitmap(View view, ArrayList<View> viewsToHide, View viewToTakeFocus, Integer nullColor){
+
+		if (view == null){
+			Log.e("com.tools", "null view was input");
+			return null;
+		}
+
 		// find which view has focus and turn it off
 		int childHasFocus = -1;
 		if (view instanceof ViewGroup){
@@ -1413,7 +1415,7 @@ public class Tools {
 				}
 			}
 		}
-		
+
 		// hide requested views
 		HashMap<View, Integer> previousStateViews = new HashMap<View, Integer>();
 		if (viewsToHide != null){
@@ -1433,14 +1435,14 @@ public class Tools {
 			viewToTakeFocus.setFocusableInTouchMode(true);
 			viewToTakeFocus.requestFocus();
 		}
-		
+
 		// create the bitmap
 		Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
 		if (bitmap != null){
 			Canvas c = new Canvas(bitmap);
 			view.draw(c);
 		}
-		
+
 		// extract center region of bitmap
 		if (nullColor != null)
 			bitmap = bitmapExtractCenter(bitmap, nullColor);
@@ -1454,7 +1456,7 @@ public class Tools {
 				}
 			}
 		}
-		
+
 		// reset focus
 		if (viewToTakeFocus != null){
 			viewToTakeFocus.setFocusableInTouchMode(isFocusable);
@@ -1464,36 +1466,36 @@ public class Tools {
 			View v = vg.getChildAt(childHasFocus);
 			v.requestFocus();
 		}
-		
+
 		// the bitmap
 		return bitmap;
 	}
-    
-    /**
-     * Remove the edges of bitmap by extracting the center region that do not match the given nullColor
-     * @param bitmap the source bitmap
-     * @param nullColor the color that is considered void and we will chop. For example, for black simply enter <br>
-     * Color.argb(0, 0, 0, 0); 
-     * @return
-     */
-    public static Bitmap bitmapExtractCenter(Bitmap bitmap, int nullColor){
-    	if (bitmap == null)
-    		return null;
-    	
-    	// measure size
+
+	/**
+	 * Remove the edges of bitmap by extracting the center region that do not match the given nullColor
+	 * @param bitmap the source bitmap
+	 * @param nullColor the color that is considered void and we will chop. For example, for black simply enter <br>
+	 * Color.argb(0, 0, 0, 0); 
+	 * @return
+	 */
+	public static Bitmap bitmapExtractCenter(Bitmap bitmap, int nullColor){
+		if (bitmap == null)
+			return null;
+
+		// measure size
 		final int width = bitmap.getWidth();
 		final int height = bitmap.getHeight();
-		
+
 		// grab pixel data
 		int[] pixels = new int[width*height];
 		bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
-		
+
 		// which row will we start and end and cols as well
 		int rowStart = 0;
 		int rowEnd = height-1;
 		int colStart = 0;
 		int colEnd = width-1;
-		
+
 		// find the top that we can crop
 		boolean outerBreak = false;
 		for (int i = 0; i <height; i++){
@@ -1508,7 +1510,7 @@ public class Tools {
 				break;
 			rowStart++;
 		}
-		
+
 		// find the bottom that we can crop
 		outerBreak = false;
 		for (int i = height-1; i >= 0; i--){
@@ -1523,7 +1525,7 @@ public class Tools {
 				break;
 			rowEnd--;
 		}
-		
+
 		// find the left we can crop
 		outerBreak = false;
 		for (int j = 0; j < width; j++){
@@ -1537,7 +1539,7 @@ public class Tools {
 				break;
 			colStart++;
 		}
-		
+
 		// find the right that we can crop
 		outerBreak = false;
 		for (int j = width-1; j >= 0; j--){
@@ -1551,32 +1553,54 @@ public class Tools {
 				break;
 			colEnd--;
 		}
-		
+
 		// sub index of matrix
 		int newWidth = colEnd-colStart+1;
 		int newHeight = rowEnd-rowStart+1;
 		if (newWidth <= 0 || newHeight <= 0)
 			return null;
 		return Bitmap.createBitmap(bitmap, colStart, rowStart, newWidth, newHeight);	
-    }
-    
-    /**
-     * Checks if a bitmap with the specified size fits in memory
-     * @param bmpwidth Bitmap width
-     * @param bmpheight Bitmap height
-     * @param bmpdensity Bitmap bpp (use 2 as default)
-     * @return true if the bitmap fits in memory false otherwise
-     */
-    public static boolean checkBitmapFitsInMemory(long bmpwidth,long bmpheight, int bmpdensity ){
-        long reqsize=bmpwidth*bmpheight*bmpdensity;
-        long allocNativeHeap = Debug.getNativeHeapAllocatedSize();
+	}
+
+	/**
+	 * Checks if a bitmap with the specified size fits in memory
+	 * @param bmpwidth Bitmap width
+	 * @param bmpheight Bitmap height
+	 * @param bmpdensity Bitmap bpp (use 2 as default)
+	 * @return true if the bitmap fits in memory false otherwise
+	 */
+	public static boolean checkBitmapFitsInMemory(long bmpwidth,long bmpheight, int bmpdensity ){
+		long reqsize=bmpwidth*bmpheight*bmpdensity;
+		long allocNativeHeap = Debug.getNativeHeapAllocatedSize();
 
 
-        final long heapPad=(long) Math.max(4*1024*1024,Runtime.getRuntime().maxMemory()*0.1);
-        if ((reqsize + allocNativeHeap + heapPad) >= Runtime.getRuntime().maxMemory())
-        {
-            return false;
-        }
-        return true;
-    }
+		final long heapPad=(long) Math.max(4*1024*1024,Runtime.getRuntime().maxMemory()*0.1);
+		if ((reqsize + allocNativeHeap + heapPad) >= Runtime.getRuntime().maxMemory())
+		{
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * If we input a valid email address. If null or empty, then false. <br>
+	 * ie someone@gmail.com vs someone.com
+	 * @param email The email to check
+	 * @return True if acceptible format, false otherwise
+	 */
+	public static boolean isValidEmail(String email){
+		if (email == null || email.length() == 0)
+			return false;
+		Pattern pattern;
+		Matcher matcher;
+
+		final String EMAIL_PATTERN = 
+			"^[_A-Za-z0-9-]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
+
+		pattern = Pattern.compile(EMAIL_PATTERN);
+
+		// Validate hex with regular expression
+		matcher = pattern.matcher(email);
+		return matcher.matches();
+	}
 }
