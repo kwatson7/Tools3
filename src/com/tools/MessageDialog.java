@@ -23,6 +23,8 @@ extends Activity {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		setContentView(R.layout.transparant);
 
 		// initialize variables
 		String title=null;
@@ -59,5 +61,17 @@ extends Activity {
 		});
 		alert.show();
 
+	}
+	
+	@Override
+	public void onPause(){
+		overridePendingTransition(0, R.anim.picture_scale_down_animation);
+		super.onPause();
+	}
+
+	@Override
+	public void onResume(){
+		overridePendingTransition(R.anim.picture_scale_up_animation, 0);
+		super.onResume();
 	}
 }

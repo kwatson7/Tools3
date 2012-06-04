@@ -1356,7 +1356,8 @@ public class Tools {
 	}
 
 	/**
-	 * Read a file into a byte[]. Output will be null if file cannot be read
+	 * Read a file into a byte[]. Output will be null if file cannot be read <br>
+	 * *** no header data is read for an image file, so com.tools.image.ImageLoader.readFullFile ***
 	 * @param fileName the file to read
 	 * @return the byte[] of the file
 	 */

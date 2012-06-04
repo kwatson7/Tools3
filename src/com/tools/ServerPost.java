@@ -174,29 +174,6 @@ public class ServerPost {
 	}
 
 	/**
-	 * Add the file to the post
-	 * @param key the key associated with this file
-	 * @param fileType the type of file
-	 * @param fileName the filename full path. Just the name of the file will be associated with this post
-	 * @return true if we were able to read the file, and false otherwise.
-	 */
-	public boolean addFileDONTUSE(String key, FileType fileType, String fileName){
-		// read the file
-		byte[] data = com.tools.Tools.readFile(fileName);
-		if (data == null)
-			return false;
-
-		// get the name of the file
-		File file = new File(fileName);
-		String name = file.getName();
-
-		// save file in post
-		addFile(key, data, fileType, name);
-
-		return true;
-	}
-
-	/**
 	 * Post the data to the url
 	 * @return the server response
 	 */

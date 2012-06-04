@@ -1,5 +1,6 @@
 package com.tools.images;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -303,6 +304,30 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		}
 		else	
 			return null;
+	}	
+	
+	/**
+	 * Read a picture from the given path, return null if unsuffessful <br>
+	 * Make sure to NOT call on main UI thread because it's slow <br>
+	 * Will be properly rotated based on exif data stored in image. This is getThumbnail, because if it's a full size image, we will probably crash when rotating. <br>
+	 * Warning this decodes and re-encodes the file
+	 * @param path The path to the image
+	 * @param imageQuality The imagequality to re-encode file
+	 * @return the byte array
+	 */
+	public static byte[] getThumbnailAsByteArray(String path, int imageQuality){
+		Bitmap bmp = getThumbnail(path);
+		if (bmp == null)
+			return null;
+
+		// turn back into byte array
+		ByteArrayOutputStream out = new ByteArrayOutputStream(bmp.getWidth()*bmp.getHeight());
+		bmp.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
+		byte[] result = out.toByteArray();
+		
+		return result;
+		
+		//TODO: we shouldn't have to decode the file and re-encode to just read the byte array of image data.
 	}
 
 	/**
