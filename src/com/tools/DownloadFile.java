@@ -8,16 +8,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.ArrayList;
-
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.impl.auth.BasicScheme;
 
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
-import android.util.Base64;
 import android.util.Log;
 import android.widget.ProgressBar;
 
@@ -59,7 +54,6 @@ public class DownloadFile {
 		// create the task
 		DownloadFileAsync<ACTIVITY_TYPE> task = new DownloadFileAsync<ACTIVITY_TYPE>(
 				act,
-				url,
 				saveFilePath,
 				showDialog,
 				progressBars,
@@ -76,6 +70,17 @@ public class DownloadFile {
 	 * @return True if we downloaded successfully and false otherwise. If false, error logs are written
 	 */
 	public boolean downloadFile(String saveFilePath){
+		return downloadFile(saveFilePath, null);
+	}
+	
+	/**
+	 * Download a file from the given url <br>
+	 * Call on background thread as it is slow
+	 * @param saveFilePath The local path to save the file
+	 * @param callback This is used to show the progress as we download the file and check if we should cancel
+	 * @return True if we downloaded successfully and false otherwise. If false, error logs are written
+	 */
+	private boolean downloadFile(String saveFilePath, PublishFileProgress callback){
 
 		// initialize some variables
 		OutputStream output = null;
@@ -90,6 +95,9 @@ public class DownloadFile {
 			URL url2 = new URL(url);
 			HttpURLConnection  connection = (HttpURLConnection) url2.openConnection();
 			connection.connect();
+			
+			// this will be useful so that you can show a typical 0-100% progress bar
+			int fileLength = connection.getContentLength();
 			
 			// authentication
 			/*
@@ -113,9 +121,20 @@ public class DownloadFile {
 			// setup for downloading
 			byte data[] = new byte[BUFFER_SIZE];
 			int count;
+			long total = 0;
+			int i = 0;
 
 			// write in buffered increments
 			while ((count = input.read(data)) != -1) {
+				if (callback != null && callback.shouldWeCancel())
+					return false;
+				
+				// publishing the progress....
+				total += count;
+				if (SKIP_EVERY_N_ON_PUBLISH <= 0 || i % SKIP_EVERY_N_ON_PUBLISH == 0 && callback != null)
+					callback.onProgress((int) (total * 100 / fileLength));
+				i++;
+				
 				output.write(data, 0, count);
 			}
 		}catch(FileNotFoundException e){
@@ -125,22 +144,27 @@ public class DownloadFile {
 			Log.e(LOG_TAG, Log.getStackTraceString(e));
 			return false;
 		}finally{
+			
 			// perform cleanup
 			if (output != null){
 				try{ 
 					output.flush();
-				}catch(Exception e){}
+				}catch(Exception e){
+					Log.e(LOG_TAG, Log.getStackTraceString(e));
+				}
 			}
 			if (output != null){
 				try{ 
 					output.close();
-				}catch(Exception e){}
+				}catch(Exception e){
+					Log.e(LOG_TAG, Log.getStackTraceString(e));
+				}
 			}
 			try {
 				if (input != null)
 					input.close();
 			} catch (IOException e) {
-				Log.e("TAG", Log.getStackTraceString(e));
+				Log.e(LOG_TAG, Log.getStackTraceString(e));
 				return true;
 			}
 		}
@@ -152,7 +176,7 @@ public class DownloadFile {
 	/**
 	 * class used to post to server in the background
 	 */
-	private static class DownloadFileAsync <ACTIVITY_TYPE extends CustomActivity>
+	private class DownloadFileAsync <ACTIVITY_TYPE extends CustomActivity>
 	extends CustomAsyncTask<ACTIVITY_TYPE, Integer, Boolean>{
 
 		// member variables
@@ -160,7 +184,6 @@ public class DownloadFile {
 		private String saveFilePath;
 		private boolean showDialog;
 		private boolean cancelTask = false;
-		private String url;
 
 		// constants
 		private static final String DIALOG_TITLE = "Downloading File";
@@ -169,7 +192,6 @@ public class DownloadFile {
 		/**
 		 * Download a file on a backgroudn thread
 		 * @param act The activity to call task
-		 * @param url The url to download from
 		 * @param saveFilePath The file to save to
 		 * @param showDialog Should we show a progress dialog?
 		 * @param progressBars Progress bars to update (The string identifiers). Null if none
@@ -177,7 +199,6 @@ public class DownloadFile {
 		 */
 		private DownloadFileAsync(
 				ACTIVITY_TYPE act,
-				String url,
 				String saveFilePath,
 				boolean showDialog,
 				ArrayList<String> progressBars,
@@ -191,7 +212,6 @@ public class DownloadFile {
 			this.callback = callback;
 			this.saveFilePath = saveFilePath;
 			this.showDialog = showDialog;
-			this.url = url;
 			attach(act);
 		}
 
@@ -201,7 +221,21 @@ public class DownloadFile {
 
 		@Override
 		protected Boolean doInBackground(Void... params) {
-			boolean result = downloadFileHelper(saveFilePath);
+			//boolean result = downloadFileHelper(saveFilePath);
+			boolean result = downloadFile(saveFilePath, new PublishFileProgress() {
+				
+				@Override
+				public boolean shouldWeCancel() {
+					// check if we should cancel
+					return (cancelTask || isCancelled());
+				}
+				
+				@Override
+				public void onProgress(int percentComplete) {
+					publishProgress(percentComplete);	
+				}
+			});
+			
 			if (callback != null)
 				callback.onPostFinished(callingActivity, result, saveFilePath);
 			return result;
@@ -254,86 +288,6 @@ public class DownloadFile {
 				});
 			}
 		}
-
-		/**
-		 * Download the file to the given filepath
-		 * @param saveFilePath The file path
-		 * @return true if we finished succesffully, false otherwise. If there were errors, they are written to log
-		 */
-		private boolean downloadFileHelper(String saveFilePath){
-
-			// initialize some variables
-			OutputStream output = null;
-			InputStream input = null;
-
-			// wrap in to try catch, so we can perform cleanup
-			try{
-				// make sure the save file path is accessible
-				output = new FileOutputStream(saveFilePath);
-
-				// open the url connection
-				URL url2 = new URL(url);
-				URLConnection connection = url2.openConnection();
-				connection.connect();
-
-				// this will be useful so that you can show a typical 0-100% progress bar
-				int fileLength = connection.getContentLength();
-
-				// download the file
-				input = new BufferedInputStream(url2.openStream());
-
-				// setup for downloading
-				byte data[] = new byte[BUFFER_SIZE];
-				long total = 0;
-				int count;
-
-				// write in buffered increments
-				int i = 0;
-				while ((count = input.read(data)) != -1) {
-
-					// check if we should cancel
-					if (cancelTask || isCancelled())
-						return false;
-
-					// publishing the progress....
-					total += count;
-					if (SKIP_EVERY_N_ON_PUBLISH <= 0 || i % SKIP_EVERY_N_ON_PUBLISH == 0)
-						publishProgress((int) (total * 100 / fileLength));
-					i++;
-
-					// write to file
-					output.write(data, 0, count);
-				}
-			}catch(FileNotFoundException e){
-				Log.e(LOG_TAG, Log.getStackTraceString(e));
-				return false;
-			} catch (IOException e) {
-				Log.e(LOG_TAG, Log.getStackTraceString(e));
-				return false;
-			}finally{
-				// perform cleanup
-				if (output != null){
-					try{ 
-						output.flush();
-					}catch(Exception e){}
-				}
-				if (output != null){
-					try{ 
-						output.close();
-					}catch(Exception e){}
-				}
-				try {
-					if (input != null)
-						input.close();
-				} catch (IOException e) {
-					Log.e("TAG", Log.getStackTraceString(e));
-					return true;
-				}
-			}
-
-			// successful
-			return true;
-		}
 	}
 
 	public interface GetFileCallback <ACTIVITY_TYPE extends CustomActivity>{
@@ -352,5 +306,18 @@ public class DownloadFile {
 		 * @param fileName The filename we attempted to save to
 		 */
 		public void onPostFinishedUiThread(ACTIVITY_TYPE act, boolean result, String fileName);
+	}
+	
+	private interface PublishFileProgress{
+		/**
+		 * This will run on the background thread as we download the file
+		 * @param percentComplete The percent complete the file has downloaded
+		 */
+		public void onProgress(int percentComplete);
+		/**
+		 * If there are any values you want to interogate that determine if we should cancel the download
+		 * @return true to cancel, false to not cancel
+		 */
+		public boolean shouldWeCancel();
 	}
 }

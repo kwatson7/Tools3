@@ -1,6 +1,3 @@
-/**
- * 
- */
 package com.tools;
 
 import java.io.ByteArrayOutputStream;
@@ -8,6 +5,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.math.BigInteger;
 import java.security.SecureRandom;
@@ -34,7 +33,6 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.media.MediaScannerConnection;
@@ -73,6 +71,9 @@ public class Tools {
 	public static final String OPTION = "OPTION";
 	/** field where sms receivers store the number of texts sent */
 	public static final String NUM_MESSAGES = "NUM_MESSAGES";
+	/** The prefereed buffer size for writting input streams to file */
+	public static final int BUFFER_SIZE = 1024;
+	private static final String LOG_TAG = "Tools";
 
 	/** Take input of original Size object that must fit within fitSize 
 	 * and output new size that preserves aspect ratio with no cropping.*
@@ -1603,5 +1604,61 @@ public class Tools {
 		// Validate hex with regular expression
 		matcher = pattern.matcher(email);
 		return matcher.matches();
+	}
+	
+	/**
+	 * Write the response from the server as an input stream to a file.
+	 * @param inputStream The input stream to read from
+	 * @param filePath The path to write to
+	 * @throws IOException
+	 */
+	public static void writeInputStreamToFile(
+			InputStream inputStream,
+			String filePath)
+			throws IOException{
+
+		if (filePath == null)
+			throw(new FileNotFoundException());
+
+		// initialize some variables
+		OutputStream output = null;
+
+		// wrap in try-catch, so we can perform cleanup
+		try{
+			// make sure the save file path is accessible
+			output = new FileOutputStream(filePath);
+
+			// setup for downloading
+			byte data[] = new byte[BUFFER_SIZE];
+			int count;
+
+			// write in buffered increments
+			while ((count = inputStream.read(data)) != -1) {
+				output.write(data, 0, count);
+			}
+		}finally{
+
+			// perform cleanup
+			if (output != null){
+				try{ 
+					output.flush();
+				}catch(Exception e){
+					Log.e(LOG_TAG, Log.getStackTraceString(e));
+				}
+			}
+			if (output != null){
+				try{ 
+					output.close();
+				}catch(Exception e){
+					Log.e(LOG_TAG, Log.getStackTraceString(e));
+				}
+			}
+			try {
+				if (inputStream != null)
+					inputStream.close();
+			} catch (IOException e) {
+				Log.e(LOG_TAG, Log.getStackTraceString(e));
+			}
+		}
 	}
 }
