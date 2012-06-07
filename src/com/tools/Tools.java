@@ -166,6 +166,9 @@ public class Tools {
 				fileName = getFileNameUri(ctx, uriTarget);
 			}else
 				fileName = fileNameInput;
+			
+			// write the folders
+			com.tools.Tools.writeRequiredFolders(fileName);
 
 			// write file
 			FileOutputStream imageFileOS = null;
@@ -1607,7 +1610,7 @@ public class Tools {
 	}
 	
 	/**
-	 * Write the response from the server as an input stream to a file.
+	 * Write the response from the server as an input stream to a file. The required folders will be written if not present.
 	 * @param inputStream The input stream to read from
 	 * @param filePath The path to write to
 	 * @throws IOException
@@ -1617,8 +1620,12 @@ public class Tools {
 			String filePath)
 			throws IOException{
 
+		// if there was a bad input file
 		if (filePath == null)
 			throw(new FileNotFoundException());
+		
+		// write the required directories to the file
+		com.tools.Tools.writeRequiredFolders(filePath);
 
 		// initialize some variables
 		OutputStream output = null;
@@ -1660,5 +1667,32 @@ public class Tools {
 				Log.e(LOG_TAG, Log.getStackTraceString(e));
 			}
 		}
+	}
+	
+	/**
+	 * Write all the folders required to write the given file or folder path. <br>
+	 * ie. filePath = "/sdcard/appName/picture.jpg". This will make sure that the folder at /sdcard/appName exists
+	 * @param filePath The path we want to eventually write
+	 * @throws IOException Throws an exception if we couldn't create the path
+	 */
+	public static void writeRequiredFolders(String filePath)
+	throws IOException{
+		
+		// no file
+		if (filePath == null || filePath.length() == 0)
+			return;
+		
+		// grab the parent folder
+		File file = new File(filePath);
+		File parent = file.getParentFile();
+		
+		// no parent
+		if (parent == null)
+			return;
+		
+		// check for existence and make if not exist
+		if (!parent.exists())
+			if(!parent.mkdirs())
+				throw new IOException("Cannot create folder " + parent.getAbsolutePath());
 	}
 }

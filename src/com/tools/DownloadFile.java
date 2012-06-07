@@ -85,9 +85,13 @@ public class DownloadFile {
 		// initialize some variables
 		OutputStream output = null;
 		InputStream input = null;
-
+		
 		// wrap in to try catch, so we can perform cleanup
 		try{
+			
+			// write the required folders
+			com.tools.Tools.writeRequiredFolders(saveFilePath);
+			
 			// make sure the save file path is accessible
 			output = new FileOutputStream(saveFilePath);
 
