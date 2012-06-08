@@ -1,5 +1,6 @@
 package com.tools;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -8,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.lang.ref.WeakReference;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -50,6 +52,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 /**
@@ -1613,13 +1616,21 @@ public class Tools {
 	 * Write the response from the server as an input stream to a file. The required folders will be written if not present.
 	 * @param inputStream The input stream to read from
 	 * @param filePath The path to write to
+	 * @param dataLength the total length of the data to read, <0 if unknown
+	 * @param progressBar a weakReference to a progress bar, null if none
 	 * @return the number of bytes written to file
 	 * @throws IOException
 	 */
-	public static int writeInputStreamToFile(
+	public static long writeInputStreamToFile(
 			InputStream inputStream,
-			String filePath)
+			String filePath,
+			final long dataLength,
+			ProgressBar progressBar)
 			throws IOException{
+		
+		// store weakReference
+		WeakReference<ProgressBar> weakProgress = new WeakReference<ProgressBar>(progressBar);
+		progressBar = null;
 
 		// if there was a bad input file
 		if (filePath == null)
@@ -1630,7 +1641,7 @@ public class Tools {
 
 		// initialize some variables
 		OutputStream output = null;
-		int total = 0;
+		long total = 0;
 
 		// wrap in try-catch, so we can perform cleanup
 		try{
@@ -1639,15 +1650,39 @@ public class Tools {
 
 			// setup for downloading
 			byte data[] = new byte[BUFFER_SIZE];
-			int count;
+			int count;							
 
 			// write in buffered increments
 			while ((count = inputStream.read(data)) != -1) {
 				output.write(data, 0, count);
 				total += count;
+				
+				// show the progress bar
+				final ProgressBar prog = weakProgress.get();
+				if (prog != null && dataLength > 0){
+					prog.setVisibility(View.VISIBLE);
+					Activity act = (Activity)prog.getContext();
+					final long total2 = total;
+					act.runOnUiThread(new Runnable() {
+						
+						@Override
+						public void run() {
+							prog.setProgress((int) (100 * total2 / dataLength));
+							
+						}
+					});
+				}
 			}
+			
 		}finally{
 
+			try{
+				final ProgressBar prog = weakProgress.get();
+				prog.setVisibility(View.INVISIBLE);
+			}catch(Exception e){
+				Log.e(LOG_TAG, Log.getStackTraceString(e));
+			}
+			
 			// perform cleanup
 			if (output != null){
 				try{ 

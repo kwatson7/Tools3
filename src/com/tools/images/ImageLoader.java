@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +24,7 @@ import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.util.Log;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 
 public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
@@ -351,21 +353,27 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	 * @param thumbnail The data required to find / create the thumbnail
 	 * @param fullPictuure The data required to find / create the full image
 	 * @param imageView The imageView to put the image
+	 * @param progressBar a progressbar to show, null if none.
 	 */
 	public void DisplayImage(
 			ID_TYPE pictureRowId,
 			THUMBNAIL_TYPE thumbnail,
 			FULL_IMAGE_TYPE fullPictuure,
-			ImageView imageView)
+			ImageView imageView,
+			ProgressBar progressBar)
 	{
 
+		WeakReference<ProgressBar> weakProgress = new WeakReference<ProgressBar>(progressBar);
+		progressBar = null;
+		
 		// create the object containing all the relevant data
 		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data =
 				new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
 						pictureRowId,
 						thumbnail,
 						fullPictuure,
-						imageView);
+						imageView,
+						weakProgress.get());
 
 				// store the links
 				imageViews.put(imageView, pictureRowId);
@@ -488,9 +496,10 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		 * @param fullSizeData The data needed to get the picture
 		 * @param desiredWidth The max width this image should be to avoid memory errors
 		 * @param desiredHeight The max height this image should be to avoid memory errors
+		 * @param weakProgess, A weak reference to a progressBar to update file progress, weakProgress.get() can return null
 		 * @return The bitmap, or null if unsuccessful
 		 */
-		public Bitmap onFullSizeWeb(FULL_IMAGE_TYPE fullSizeData, int desiredWidth, int desiredHeight);
+		public Bitmap onFullSizeWeb(FULL_IMAGE_TYPE fullSizeData, int desiredWidth, int desiredHeight, WeakReference<ProgressBar> weakProgress);
 		/**
 		 * Load in a thumbnail. This should be a small picture that loads quickly and ideally does not require resizing
 		 * @param thumbnailData The data needed to get the picture
@@ -596,7 +605,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 					if (fullBmp == null)
 						fullBmp = loadImageCallback.onFullSizeLocal(photoToLoad.fullPicture, desiredWidth, desiredHeight);
 					if (fullBmp == null)
-						fullBmp = loadImageCallback.onFullSizeWeb(photoToLoad.fullPicture, desiredWidth, desiredHeight);
+						fullBmp = loadImageCallback.onFullSizeWeb(photoToLoad.fullPicture, desiredWidth, desiredHeight, photoToLoad.weakProgress);
 					if (fullBmp != null)
 						memoryCache.putFullPicture(photoToLoad.pictureId, fullBmp);
 
@@ -624,16 +633,19 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		public THUMBNAIL_TYPE thumbnail;
 		public FULL_IMAGE_TYPE fullPicture;
 		public SoftReference<ImageView> imageViewSoftReference;
+		public WeakReference<ProgressBar> weakProgress;
 		public ID_TYPE pictureId;
 		public PhotoToLoad(
 				ID_TYPE pictureId,
 				THUMBNAIL_TYPE thumbnail,
 				FULL_IMAGE_TYPE fullPicture,
-				ImageView image){
+				ImageView image,
+				ProgressBar progressBar){
 			this.thumbnail = thumbnail;
 			this.fullPicture = fullPicture;
 			this.pictureId = pictureId;
 			imageViewSoftReference = new SoftReference<ImageView>(image);
+			this.weakProgress = new WeakReference<ProgressBar>(progressBar);
 		}
 	}
 }

@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.ref.WeakReference;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import org.apache.http.HttpEntity;
@@ -31,6 +32,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.util.Log;
+import android.widget.ProgressBar;
 
 public class ServerPost {
 
@@ -123,9 +125,13 @@ public class ServerPost {
 
 	/**
 	 * Post the data to the url
+	 * @param progressBar the progressBar to write file download progress to. Null if none
 	 * @return the server response
 	 */
-	public ServerReturn post(){
+	public ServerReturn post(ProgressBar progressBar){
+		
+		WeakReference<ProgressBar> weakProgress = new WeakReference<ProgressBar>(progressBar);
+		progressBar = null;
 
 		// set the connection parameters
 		HttpParams httpParameters = new BasicHttpParams();
@@ -166,6 +172,7 @@ public class ServerPost {
 				// read return
 				HttpEntity entity = response.getEntity();
 				InputStream content = entity.getContent();
+				long dataLength = entity.getContentLength();
 
 				// read the response as a string
 				if (filePath == null){
@@ -189,7 +196,7 @@ public class ServerPost {
 				}else{
 					// read the response as a file
 					if (binaryDownloader == null){
-						int count = com.tools.Tools.writeInputStreamToFile(content, filePath);
+						long count = com.tools.Tools.writeInputStreamToFile(content, filePath, dataLength, weakProgress.get());
 						if (count > 0)
 							return new ServerReturn(true);
 						else{
@@ -198,7 +205,7 @@ public class ServerPost {
 							return out;
 						}
 					}else{
-						SuccessReason result = binaryDownloader.readInputStream(content, filePath);
+						SuccessReason result = binaryDownloader.readInputStream(content, filePath, dataLength, weakProgress);
 						if (result.getSuccess())
 							return new ServerReturn(result.getReason(), result.getReason());
 						else{
@@ -232,16 +239,18 @@ public class ServerPost {
 	/**
 	 * Post the data to the server and run the callback when completed. onPostFinishedUiThread is called first
 	 * @param act The activity to post the callback to. Can be null
+	 * @param progresssBar, progressBar to post filedownload progress to. Null if none.
 	 * @param callback the callback to call when post is finished
 	 */
 	public <ACTIVITY_TYPE extends CustomActivity>
 	void postInBackground(
 			ACTIVITY_TYPE  act,
+			ProgressBar progressBar,
 			final PostCallback<ACTIVITY_TYPE> callback){
 
 		// setup background thread and execute
 		PostAsync<ACTIVITY_TYPE> task = 
-			new PostAsync<ACTIVITY_TYPE>(act, callback);
+			new PostAsync<ACTIVITY_TYPE>(act, callback, progressBar);
 
 			task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
 
@@ -310,12 +319,16 @@ public class ServerPost {
 		 * @See com.tools.Tools.writeInputStreamToFile
 		 * @param inputStream The input stream to read from
 		 * @param filePath The path to write to
+		 * @param dataLength the total length of the data, negative number if unknown
+		 * @param weakProgress the progress bar to write progress to, null if unknown or not going to happen
 		 * @throws IOException
 		 * @returns The type of return from the server. Success says if we were successfull, and reason, has either the failed reason, or the return from the server on success.
 		 */
 		public SuccessReason readInputStream(
 				InputStream inputStream,
-				String filePath)
+				String filePath,
+				long dataLength,
+				WeakReference<ProgressBar> weakProgress)
 		throws IOException;
 	}
 
@@ -621,10 +634,12 @@ public class ServerPost {
 	extends CustomAsyncTask<ACTIVITY_TYPE, Void, ServerReturn>{
 
 		private PostCallback<ACTIVITY_TYPE> callback;
+		private WeakReference<ProgressBar> prog;
 
 		private PostAsync(
 				ACTIVITY_TYPE act,
-				final PostCallback<ACTIVITY_TYPE> callback) {
+				final PostCallback<ACTIVITY_TYPE> callback,
+				ProgressBar prog) {
 			super(
 					act,
 					-1,
@@ -632,11 +647,12 @@ public class ServerPost {
 					false,
 					null);
 			this.callback = callback;
+			this.prog = new WeakReference<ProgressBar>(prog);
 		}
 
 		@Override
 		protected ServerReturn doInBackground(Void... params) {
-			ServerReturn result = post();
+			ServerReturn result = post(prog.get());
 			callback.onPostFinished(callingActivity, result);
 			return result;
 		}
