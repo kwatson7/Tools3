@@ -1613,9 +1613,10 @@ public class Tools {
 	 * Write the response from the server as an input stream to a file. The required folders will be written if not present.
 	 * @param inputStream The input stream to read from
 	 * @param filePath The path to write to
+	 * @return the number of bytes written to file
 	 * @throws IOException
 	 */
-	public static void writeInputStreamToFile(
+	public static int writeInputStreamToFile(
 			InputStream inputStream,
 			String filePath)
 			throws IOException{
@@ -1629,6 +1630,7 @@ public class Tools {
 
 		// initialize some variables
 		OutputStream output = null;
+		int total = 0;
 
 		// wrap in try-catch, so we can perform cleanup
 		try{
@@ -1642,6 +1644,7 @@ public class Tools {
 			// write in buffered increments
 			while ((count = inputStream.read(data)) != -1) {
 				output.write(data, 0, count);
+				total += count;
 			}
 		}finally{
 
@@ -1667,6 +1670,8 @@ public class Tools {
 				Log.e(LOG_TAG, Log.getStackTraceString(e));
 			}
 		}
+		
+		return total;
 	}
 	
 	/**

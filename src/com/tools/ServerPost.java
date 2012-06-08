@@ -2,9 +2,12 @@ package com.tools;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
@@ -33,7 +36,6 @@ public class ServerPost {
 
 	// constants
 	private final Charset ENCODING_TYPE = Charset.forName("UTF-8"); // the type of the data
-// constants
 	private static final int RANDOM_FILENAME_LENGTH = 64; 			// if we create a random filename, the length of the filename
 	private static final int GOOD_RETURN_CODE = 200; 				// The return code for a successful sync with server
 	private static final String LOG_TAG = "ServerPost"; 			// The log tag
@@ -45,6 +47,7 @@ public class ServerPost {
 	private int timeoutConnection = 5000; 							// Default to wait for timeout to connect			
 	private int timeoutSocket = 90000; 								// Default length of time to wait for returned data
 	private String filePath = null;
+	private BinarayDownloader binaryDownloader = null;
 
 	/**
 	 * Create a server post object
@@ -185,8 +188,25 @@ public class ServerPost {
 						serverReturnValue = serverReturnValueLastLine;
 				}else{
 					// read the response as a file
-					com.tools.Tools.writeInputStreamToFile(content, filePath);
-					return new ServerReturn(true);
+					if (binaryDownloader == null){
+						int count = com.tools.Tools.writeInputStreamToFile(content, filePath);
+						if (count > 0)
+							return new ServerReturn(true);
+						else{
+							ServerReturn out = new ServerReturn();
+							out.setError(ServerReturn.CODE_NO_BYTES_WRITTEN, ServerReturn.NO_BYTES_WRITTEN_STRING);
+							return out;
+						}
+					}else{
+						SuccessReason result = binaryDownloader.readInputStream(content, filePath);
+						if (result.getSuccess())
+							return new ServerReturn(result.getReason(), result.getReason());
+						else{
+							ServerReturn out = new ServerReturn();
+							out.setError(ServerReturn.BAD_CUSTOM_BINARY_RETURN, result.getReason());
+							return out;
+						}
+					}
 				}
 
 				// bad return code
@@ -221,16 +241,16 @@ public class ServerPost {
 
 		// setup background thread and execute
 		PostAsync<ACTIVITY_TYPE> task = 
-				new PostAsync<ACTIVITY_TYPE>(act, callback);
+			new PostAsync<ACTIVITY_TYPE>(act, callback);
 
-				task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
+			task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
 
-					@Override
-					public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
-						callback.onPostFinishedUiThread(activity, result);					
-					}
-				});
-				task.execute();
+				@Override
+				public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
+					callback.onPostFinishedUiThread(activity, result);					
+				}
+			});
+			task.execute();
 	}
 
 	/**
@@ -239,6 +259,14 @@ public class ServerPost {
 	 */
 	public void setConnectionTimeout(int connectionTimeoutMs){
 		timeoutConnection = connectionTimeoutMs;
+	}
+
+	/**
+	 * Set a custom callback to be used to handle binary return from server
+	 * @param binaryDownloader The downloader to use. Set to null to use default (that just parses raw binary and writes to file).
+	 */
+	public void setCustomBinaryDownloader(BinarayDownloader binaryDownloader){
+		this.binaryDownloader = binaryDownloader;
 	}
 
 	/**
@@ -275,6 +303,22 @@ public class ServerPost {
 				HttpMultipartMode.BROWSER_COMPATIBLE);
 	}
 
+	public interface BinarayDownloader{
+		/**
+		 * read the response from the server as an input stream and write data to a file.
+		 * The required folders should be be written if not present. <br>
+		 * @See com.tools.Tools.writeInputStreamToFile
+		 * @param inputStream The input stream to read from
+		 * @param filePath The path to write to
+		 * @throws IOException
+		 * @returns The type of return from the server. Success says if we were successfull, and reason, has either the failed reason, or the return from the server on success.
+		 */
+		public SuccessReason readInputStream(
+				InputStream inputStream,
+				String filePath)
+		throws IOException;
+	}
+
 	/**
 	 * Different file types
 	 */
@@ -302,6 +346,8 @@ public class ServerPost {
 		}
 	}
 
+
+
 	/**
 	 * Callback when we are done posting to the server and we can read the response
 	 * @author kwatson
@@ -324,15 +370,13 @@ public class ServerPost {
 		public void onPostFinishedUiThread(ACTIVITY_TYPE act, ServerReturn result);
 	}
 
-
-
 	/**
 	 * The response we receive when we are finished posting to the server
 	 * @author kwatson
 	 *
 	 */
 	public static class ServerReturn{
-		
+
 		// member variables
 		private String serverReturnValue = "";
 		private String serverReturnValueLastLine = "";
@@ -373,6 +417,17 @@ public class ServerPost {
 		private static final String UNKNOWN_HOST_EXCEPTION_STRING = "Error accessing host. Check internet connection: ";
 
 		/**
+		 * No byte data was written to file
+		 */
+		public static final String CODE_NO_BYTES_WRITTEN = "CODE_NO_BYTES_WRITTEN";
+		private static final String NO_BYTES_WRITTEN_STRING = "No data written to file";
+		
+		/**
+		 * The custom binary downloader returned a bad value
+		 */
+		public static final String BAD_CUSTOM_BINARY_RETURN = "BAD_CUSTOM_BINARY_RETURN";
+
+		/**
 		 * Initialize return with unknown error
 		 */
 		public ServerReturn(){
@@ -390,6 +445,19 @@ public class ServerPost {
 			this.errorCode = toCopy.errorCode;
 			this.jsonArray = toCopy.jsonArray;
 			this.jsonObject = toCopy.jsonObject;
+		}
+
+		/**
+		 * Create a completed server return item
+		 * @param serverReturnValue the entire return from the server
+		 * @param serverReturnValueLastLine just the last line return from the server
+		 */
+		public ServerReturn(
+				String serverReturnValue,
+				String serverReturnValueLastLine){
+			// store values
+			this.serverReturnValue = serverReturnValue;
+			this.serverReturnValueLastLine = serverReturnValueLastLine;
 		}
 
 		/**
@@ -419,19 +487,6 @@ public class ServerPost {
 		private ServerReturn(IOException e){
 			errorCode = IO_EXCEPTION;
 			detailErrorMessage = e.getMessage();
-		}
-
-		/**
-		 * Create a completed server return item
-		 * @param serverReturnValue the entire return from the server
-		 * @param serverReturnValueLastLine just the last line return from the server
-		 */
-		private ServerReturn(
-				String serverReturnValue,
-				String serverReturnValueLastLine){
-			// store values
-			this.serverReturnValue = serverReturnValue;
-			this.serverReturnValueLastLine = serverReturnValueLastLine;
 		}
 
 		private ServerReturn(UnknownHostException e){
@@ -544,7 +599,7 @@ public class ServerPost {
 		 * @param errorCode The identifying error code
 		 * @param detailErrorMessage The detailed error message
 		 */
-		public void setError(String errorCode, String detailErrorMessage){
+		protected void setError(String errorCode, String detailErrorMessage){
 			this.errorCode = errorCode;
 			this.detailErrorMessage = detailErrorMessage;
 		}

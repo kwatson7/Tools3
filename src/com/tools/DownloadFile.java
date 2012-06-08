@@ -102,22 +102,6 @@ public class DownloadFile {
 			
 			// this will be useful so that you can show a typical 0-100% progress bar
 			int fileLength = connection.getContentLength();
-			
-			// authentication
-			/*
-			conn.setConnectTimeout(30000);
-            conn.setReadTimeout(30000);
-
-            
-            
-            
-			String username = "kyle";
-			String password = "pass";
-			if (username != null && username.trim().length() > 0 && password != null && password.trim().length() > 0) {
-			    final String authString = username + ":" + password;
-			    connection.setRequestProperty("Authorization", "Basic " + Base64.encode(authString.getBytes(), Base64.DEFAULT));
-			}
-			*/
 
 			// download the file
 			input = new BufferedInputStream(url2.openStream());

@@ -18,6 +18,10 @@ import android.view.WindowManager;
 
 public class CameraHelper{
 	
+	//TODO: make sure we are not leaking
+	//TODO: incoroprate more from ShareBear>TakePicture.java into these calls.
+	//TODO: look into using weak references
+	
 	// private member variables
 	private OrientationEventListener mOrientationEventListener; 					// The listener to call when orientation changes
 	private Orientation mOrientation = Orientation.ORIENTATION_LANDSCAPE_NORMAL;	// The current orientation of the camera
@@ -81,6 +85,10 @@ public class CameraHelper{
 		
 		// store other values
 		this.mChangeParameters = changeParameters;
+		this.callback = callback;
+	}
+	
+	public void setRotationCallback(OnRotationCallback callback){
 		this.callback = callback;
 	}
 
@@ -483,23 +491,26 @@ public class CameraHelper{
 	 * Start the camera preview. If it is currently running, then it will stop it and restart.
 	 * If mCamera == null, then nothing will happen. This happens on a background thread.
 	 */
-	public synchronized void startPreview(){
+	public  void startPreview(){
+		//TODO: this used to be a synchronized method, see if iw need it
 		if (isPreviewStarting)
 			return;
 		if (mCamera == null){
 			isPreviewRunning = false;
 			return;
 		}
+		isPreviewStarting = true;
 		if (isPreviewRunning)
 			mCamera.stopPreview();
-		isPreviewStarting = true;
-		new Thread(new Runnable() {
-			public void run() {
+		
+		//TODO: see if we want a runnable, seems to leak and also may cause screen freeze
+	//	new Thread(new Runnable() {
+		//	public void run() {
 				mCamera.startPreview();
 				isPreviewRunning = true;
 				isPreviewStarting = false;
-			}
-		}).start();
+		//	}
+	//	}).start();
 	}
 	
 	/**
