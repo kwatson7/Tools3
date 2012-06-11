@@ -251,14 +251,6 @@ public class ServerPost {
 		// setup background thread and execute
 		PostAsync<ACTIVITY_TYPE> task = 
 			new PostAsync<ACTIVITY_TYPE>(act, callback, progressBar);
-
-			task.setFinishedCallback(new CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, ServerReturn>() {
-
-				@Override
-				public void onFinish(ACTIVITY_TYPE activity, ServerReturn result) {
-					callback.onPostFinishedUiThread(activity, result);					
-				}
-			});
 			task.execute();
 	}
 

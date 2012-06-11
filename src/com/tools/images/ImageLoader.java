@@ -31,15 +31,16 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	// private variables
 	private MemoryCache<ID_TYPE> memoryCache = new MemoryCache<ID_TYPE>(); 	// This stores the bitmaps in memory
 	private Map<ImageView, ID_TYPE> imageViews =
-			Collections.synchronizedMap(new WeakHashMap<ImageView, ID_TYPE>()); // keeps track of links between views and pictures	
+		Collections.synchronizedMap(new WeakHashMap<ImageView, ID_TYPE>()); // keeps track of links between views and pictures	
 	private ExecutorService executorService;  								// run the threads
 	private final int stub_id;	 											// The resource id of the default image
-	
+
 	private final int desiredWidth; 										// The desired width of full size image
 	private final int desiredHeight; 										// The desired screen height of full size iamge
 	private final boolean showFullImage; 									// boolean to display full image or just thumbnail
 	private LoadImage<THUMBNAIL_TYPE, FULL_IMAGE_TYPE> loadImageCallback;	// callback to load images
-	private HashMap<ID_TYPE, Object> bitmapsLoadingLocks = new HashMap<ID_TYPE, Object>();
+	private Map<ID_TYPE, Object> thumbnailsLoadingLocks = Collections.synchronizedMap(new HashMap<ID_TYPE, Object>());
+	private Map<ID_TYPE, Object> fullSizeLoadingLocks = Collections.synchronizedMap(new HashMap<ID_TYPE, Object>());
 
 	// constants
 	private static final int MAX_THREADS = 15; 								// max threads to spawn
@@ -125,14 +126,14 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
 		// save the thumbnail
 		SuccessReason thumbnailSave = 
-				com.tools.Tools.saveByteDataToFile(
-						null,
-						thumbnail,
-						"",
-						false,
-						thumbPath,
-						ExifInterface.ORIENTATION_NORMAL,
-						false);
+			com.tools.Tools.saveByteDataToFile(
+					null,
+					thumbnail,
+					"",
+					false,
+					thumbPath,
+					ExifInterface.ORIENTATION_NORMAL,
+					false);
 
 		return thumbnailSave.getSuccess();
 	}
@@ -307,7 +308,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		else	
 			return null;
 	}	
-	
+
 	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
 	 * Make sure to NOT call on main UI thread because it's slow <br>
@@ -326,9 +327,9 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 		ByteArrayOutputStream out = new ByteArrayOutputStream(bmp.getWidth()*bmp.getHeight());
 		bmp.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
 		byte[] result = out.toByteArray();
-		
+
 		return result;
-		
+
 		//TODO: we shouldn't have to decode the file and re-encode to just read the byte array of image data.
 	}
 
@@ -365,40 +366,40 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
 		WeakReference<ProgressBar> weakProgress = new WeakReference<ProgressBar>(progressBar);
 		progressBar = null;
-		
+
 		// create the object containing all the relevant data
 		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data =
-				new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
-						pictureRowId,
-						thumbnail,
-						fullPictuure,
-						imageView,
-						weakProgress.get());
+			new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
+					pictureRowId,
+					thumbnail,
+					fullPictuure,
+					imageView,
+					weakProgress.get());
 
-				// store the links
-				imageViews.put(imageView, pictureRowId);
+			// store the links
+			imageViews.put(imageView, pictureRowId);
 
-				// attempt to access cached full picture
-				Bitmap bitmap = null;
-				if (showFullImage)
-					bitmap = memoryCache.getFullPicture(pictureRowId);
+			// attempt to access cached full picture
+			Bitmap bitmap = null;
+			if (showFullImage)
+				bitmap = memoryCache.getFullPicture(pictureRowId);
 
-				// no full picture, so queue the photo loader, and check for thumbnail
-				if (bitmap == null){
-					bitmap = memoryCache.getThumbnail(pictureRowId);
-					if (bitmap == null)
-						queuePhoto(data, true);
-					else if (showFullImage)
-						queuePhoto(data, false);
-				}
+			// no full picture, so queue the photo loader, and check for thumbnail
+			if (bitmap == null){
+				bitmap = memoryCache.getThumbnail(pictureRowId);
+				if (bitmap == null)
+					queuePhoto(data, true);
+				else if (showFullImage)
+					queuePhoto(data, false);
+			}
 
-				// see if we have a bitmap to access
-				if(bitmap!=null)
-					imageView.setImageBitmap(bitmap);
+			// see if we have a bitmap to access
+			if(bitmap!=null)
+				imageView.setImageBitmap(bitmap);
 
-				// otherwise just show the default image
-				else
-					imageView.setImageResource(stub_id);
+			// otherwise just show the default image
+			else
+				imageView.setImageResource(stub_id);
 	}
 
 	/**
@@ -563,13 +564,13 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				return;
 
 			// create a lock to control access to this thread for this object
-			synchronized (ImageLoader.this) {
-				if (bitmapsLoadingLocks.get(photoToLoad.pictureId) == null)
-					bitmapsLoadingLocks.put(photoToLoad.pictureId, new Object());
-			}
+			if (thumbnailsLoadingLocks.get(photoToLoad.pictureId) == null)
+				thumbnailsLoadingLocks.put(photoToLoad.pictureId, new Object());
+			if (fullSizeLoadingLocks.get(photoToLoad.pictureId) == null)
+				fullSizeLoadingLocks.put(photoToLoad.pictureId, new Object());
 
 			// synchronize access to only allow for each picture single access to this block, so as not to allow mutliple grabs of the same file
-			synchronized (bitmapsLoadingLocks.get(photoToLoad.pictureId)) {
+			synchronized (thumbnailsLoadingLocks.get(photoToLoad.pictureId)) {
 
 				// should we grab the thumbnail first?
 				if (getThumbnailFirst){
@@ -597,6 +598,9 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 						}
 					}
 				}
+			}
+
+			synchronized (fullSizeLoadingLocks.get(photoToLoad.pictureId)) {
 
 				// grab the full picture
 				if (showFullImage){

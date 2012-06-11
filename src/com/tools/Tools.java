@@ -629,6 +629,7 @@ public class Tools {
 			exif = new ExifInterface(file);
 		} catch (IOException e) {
 		}
+		//TODO: handle this exception
 
 		// grab the angle from exif data
 		return getExifOrientationAngle(exif);
@@ -1660,13 +1661,13 @@ public class Tools {
 				// show the progress bar
 				final ProgressBar prog = weakProgress.get();
 				if (prog != null && dataLength > 0){
-					prog.setVisibility(View.VISIBLE);
 					Activity act = (Activity)prog.getContext();
 					final long total2 = total;
 					act.runOnUiThread(new Runnable() {
 						
 						@Override
 						public void run() {
+							prog.setVisibility(View.VISIBLE);
 							prog.setProgress((int) (100 * total2 / dataLength));
 							
 						}
@@ -1678,7 +1679,16 @@ public class Tools {
 
 			try{
 				final ProgressBar prog = weakProgress.get();
-				prog.setVisibility(View.INVISIBLE);
+				if (prog != null && dataLength > 0){
+					Activity act = (Activity)prog.getContext();
+					act.runOnUiThread(new Runnable() {
+						
+						@Override
+						public void run() {
+							prog.setVisibility(View.INVISIBLE);								
+						}
+					});
+				}
 			}catch(Exception e){
 				Log.e(LOG_TAG, Log.getStackTraceString(e));
 			}
