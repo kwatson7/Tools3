@@ -604,8 +604,8 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
 				// grab the full picture
 				if (showFullImage){
-					clearCacheIfNeeded();
 					Bitmap fullBmp = memoryCache.getFullPicture(photoToLoad.pictureId);
+					clearCacheIfNeeded();
 					if (fullBmp == null)
 						fullBmp = loadImageCallback.onFullSizeLocal(photoToLoad.fullPicture, desiredWidth, desiredHeight);
 					if (fullBmp == null)
