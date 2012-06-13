@@ -570,7 +570,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				fullSizeLoadingLocks.put(photoToLoad.pictureId, new Object());
 
 			// synchronize access to only allow for each picture single access to this block, so as not to allow mutliple grabs of the same file
-			synchronized (thumbnailsLoadingLocks.get(photoToLoad.pictureId)) {
+			//synchronized (thumbnailsLoadingLocks.get(photoToLoad.pictureId)) {
 
 				// should we grab the thumbnail first?
 				if (getThumbnailFirst){
@@ -598,9 +598,9 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 						}
 					}
 				}
-			}
+			//}
 
-			synchronized (fullSizeLoadingLocks.get(photoToLoad.pictureId)) {
+			//synchronized (fullSizeLoadingLocks.get(photoToLoad.pictureId)) {
 
 				// grab the full picture
 				if (showFullImage){
@@ -627,7 +627,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 						}
 					}
 				}
-			}
+			//}
 		}
 	}
 
