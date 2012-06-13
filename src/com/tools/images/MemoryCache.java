@@ -115,11 +115,14 @@ public class MemoryCache <ID_TYPE> {
     	TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>> data = cache.get(pictureRowId);
     	
     	// now return the actual bitmap
-    	if (data != null && data.mObject1 != null)
-    		return data.mObject1.get();
-    	else
-    		return null;
-    	
+    	if (data != null && data.mObject1 != null){
+    		Bitmap bmp = data.mObject1.get();
+    		if (bmp.isRecycled())
+    			return null;
+    		else
+    			return bmp;
+    	}else
+    		return null;   	
     }
     
     /**
@@ -136,9 +139,13 @@ public class MemoryCache <ID_TYPE> {
     	TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>> data = cache.get(pictureRowId);
     	
     	// now return the actual bitmap
-    	if (data != null && data.mObject2 != null)
-    		return data.mObject2.get();
-    	else
+    	if (data != null && data.mObject2 != null){
+    		Bitmap bmp = data.mObject2.get();
+    		if (bmp.isRecycled())
+    			return null;
+    		else
+    			return bmp;
+    	}else
     		return null;
     	
     }
