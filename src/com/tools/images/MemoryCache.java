@@ -117,7 +117,7 @@ public class MemoryCache <ID_TYPE> {
     	// now return the actual bitmap
     	if (data != null && data.mObject1 != null){
     		Bitmap bmp = data.mObject1.get();
-    		if (bmp.isRecycled())
+    		if (bmp!= null && bmp.isRecycled())
     			return null;
     		else
     			return bmp;
@@ -141,7 +141,7 @@ public class MemoryCache <ID_TYPE> {
     	// now return the actual bitmap
     	if (data != null && data.mObject2 != null){
     		Bitmap bmp = data.mObject2.get();
-    		if (bmp.isRecycled())
+    		if (bmp!= null && bmp.isRecycled())
     			return null;
     		else
     			return bmp;
