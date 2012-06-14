@@ -211,7 +211,7 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 								bar.setVisibility(ProgressBar.VISIBLE);
 						}
 					}catch (Exception e){
-						
+						Log.d("CustomAsyncTask", Log.getStackTraceString(e));
 					}
 				}
 			}

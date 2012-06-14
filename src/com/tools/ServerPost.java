@@ -12,6 +12,8 @@ import java.io.UnsupportedEncodingException;
 import java.lang.ref.WeakReference;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -240,17 +242,19 @@ public class ServerPost {
 	 * Post the data to the server and run the callback when completed. onPostFinishedUiThread is called first
 	 * @param act The activity to post the callback to. Can be null
 	 * @param progresssBar, progressBar to post filedownload progress to. Null if none.
+	 * @param indeterminateProgressBarTags, tags to indeterminate progressbars to show while posting, null if none
 	 * @param callback the callback to call when post is finished
 	 */
 	public <ACTIVITY_TYPE extends CustomActivity>
 	void postInBackground(
 			ACTIVITY_TYPE  act,
 			ProgressBar progressBar,
+			ArrayList<String> indeterminateProgressBarTags,
 			final PostCallback<ACTIVITY_TYPE> callback){
 
 		// setup background thread and execute
 		PostAsync<ACTIVITY_TYPE> task = 
-			new PostAsync<ACTIVITY_TYPE>(act, callback, progressBar);
+			new PostAsync<ACTIVITY_TYPE>(act, progressBar, indeterminateProgressBarTags, callback);
 			task.execute();
 	}
 
@@ -628,16 +632,24 @@ public class ServerPost {
 		private PostCallback<ACTIVITY_TYPE> callback;
 		private WeakReference<ProgressBar> prog;
 
+		/**
+		 * Post to the server on a background thread
+		 * @param act Teh activity that called this
+		 * @param prog A progressbar to update if downloading file, null if none
+		 * @param indeterminateProgressBarTags find the tag in the activity to show indeterminate progressbar, null if none
+		 * @param callback The callback when done, musn't be null
+		 */
 		private PostAsync(
 				ACTIVITY_TYPE act,
-				final PostCallback<ACTIVITY_TYPE> callback,
-				ProgressBar prog) {
+				ProgressBar prog,
+				ArrayList<String> indeterminateProgressBarTags,
+				final PostCallback<ACTIVITY_TYPE> callback) {
 			super(
 					act,
 					-1,
 					false,
 					false,
-					null);
+					indeterminateProgressBarTags);
 			this.callback = callback;
 			this.prog = new WeakReference<ProgressBar>(prog);
 		}
