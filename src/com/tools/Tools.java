@@ -1,6 +1,5 @@
 package com.tools;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -73,6 +72,7 @@ public class Tools {
 	public static final String NUM_MESSAGES = "NUM_MESSAGES";
 	/** The preferred buffer size for writing input streams to file */
 	public static final int BUFFER_SIZE = 1024;
+	
 	private static final String LOG_TAG = "Tools";
 
 	/**
@@ -1074,61 +1074,7 @@ public class Tools {
 
 	
 	
-	/**
-	 * Try to create the thumbnail from the full picture reading any exif data.
-	 * @param fullFile the path to the full file
-	 * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
-	 * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
-	 * @return the bitmap, or null if any errors occured
-	 */
-	public static Bitmap getThumbnail(
-			String fullFile,
-			int maxPixelSize,
-			boolean forceBase2){
-
-		// open the full file
-		if (fullFile == null || fullFile.length() == 0)
-			return null;
-		RandomAccessFile f = null;
-		try{
-			f = new RandomAccessFile(fullFile, "r");
-		}catch (FileNotFoundException  e){
-			Log.e(LOG_TAG, Log.getStackTraceString(e));
-			return null;
-		}
-
-		// read the file data
-		byte[] b = null;
-		ExifInterface exif = null;
-		try{
-			b = new byte[(int)f.length()];
-			f.read(b);
-
-			// read the orientaion
-			exif = new ExifInterface(fullFile);
-		}catch(IOException e){
-			Log.e(LOG_TAG, Log.getStackTraceString(e));
-			return null;
-		}finally{
-			try {
-				f.close();
-			} catch (IOException e) {
-				Log.e(LOG_TAG, Log.getStackTraceString(e));
-				return null;
-			}
-		}
-
-		// grab the rotation
-		int rotation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 
-				ExifInterface.ORIENTATION_UNDEFINED);
-
-		// create the byte array
-		return ImageProcessing.makeThumbnail(
-				b,
-				rotation,
-				maxPixelSize,
-				forceBase2);
-	}
+	
 
 	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
@@ -1136,7 +1082,7 @@ public class Tools {
 	 * Will be properly rotated based on exif data stored in image. <br>
 	 * Performs no resizeing, so if this picture is not already small, you may get a memory crash
 	 * @param path The path where the picture is stored
-	 * @return the bitmap The bitmap data
+	 * @return the bitmap data, null if unsuccessful
 	 */
 	public static Bitmap getThumbnail(String path){
 		try{

@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -11,6 +12,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
+import android.graphics.BitmapFactory.Options;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
@@ -26,6 +28,98 @@ public class ImageProcessing {
 	// constants
 	private static String IMAGE_TYPE = "image/jpeg";
 	private static String LOG_TAG = "com.tools";
+
+	/**
+	 * Remove the edges of bitmap by extracting the center region that do not match the given nullColor
+	 * @param bitmap the source bitmap
+	 * @param nullColor the color that is considered void and we will chopped. For example, for black simply enter: Color.argb(0, 0, 0, 0); 
+	 * @return The bitmap with the center extracted, or null if null was entered
+	 */
+	public static Bitmap bitmapExtractCenter(Bitmap bitmap, int nullColor){
+
+		// null
+		if (bitmap == null)
+			return null;
+
+		// measure size
+		final int width = bitmap.getWidth();
+		final int height = bitmap.getHeight();
+
+		// grab pixel data
+		int[] pixels = new int[width*height];
+		bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+
+		// which row will we start and end and cols as well
+		int rowStart = 0;
+		int rowEnd = height-1;
+		int colStart = 0;
+		int colEnd = width-1;
+
+		// find the top that we can crop
+		boolean outerBreak = false;
+		for (int i = 0; i <height; i++){
+			int ii = i*width;
+			for (int j = 0; j < width; j++){				
+				if (pixels[ii + j] != nullColor){
+					outerBreak = true;
+					break;				
+				}
+			}
+			if (outerBreak)
+				break;
+			rowStart++;
+		}
+
+		// find the bottom that we can crop
+		outerBreak = false;
+		for (int i = height-1; i >= 0; i--){
+			int ii = i*width;
+			for (int j = 0; j < width; j++){
+				if (pixels[ii + j] != nullColor){
+					outerBreak = true;
+					break;				
+				}
+			}
+			if (outerBreak)
+				break;
+			rowEnd--;
+		}
+
+		// find the left we can crop
+		outerBreak = false;
+		for (int j = 0; j < width; j++){
+			for (int i = 0; i <height; i++){	
+				if (pixels[i*width + j] != nullColor){
+					outerBreak = true;
+					break;				
+				}
+			}
+			if (outerBreak)
+				break;
+			colStart++;
+		}
+
+		// find the right that we can crop
+		outerBreak = false;
+		for (int j = width-1; j >= 0; j--){
+			for (int i = 0; i <height; i++){	
+				if (pixels[i*width + j] != nullColor){
+					outerBreak = true;
+					break;				
+				}
+			}
+			if (outerBreak)
+				break;
+			colEnd--;
+		}
+
+		// sub index of matrix
+		int newWidth = colEnd-colStart+1;
+		int newHeight = rowEnd-rowStart+1;
+		if (newWidth <= 0 || newHeight <= 0)
+			return null;
+		return Bitmap.createBitmap(bitmap, colStart, rowStart, newWidth, newHeight);	
+	}
 
 	/** Take input of original size image that must fit within fitSize 
 	 * and output new size that preserves aspect ratio and fill entire area by cropping.
@@ -86,7 +180,7 @@ public class ImageProcessing {
 	public static byte[] getByteArray(Bitmap bmp, int imageQuality){
 		if (bmp == null)
 			return null;
-		
+
 		ByteArrayOutputStream out = new ByteArrayOutputStream(bmp.getWidth()*bmp.getHeight());
 		bmp.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
 		return out.toByteArray();
@@ -105,7 +199,7 @@ public class ImageProcessing {
 			return 0;
 		}
 
-		// read orienation
+		// read orientation
 		int orientation = exif.getAttributeInt(
 				ExifInterface.TAG_ORIENTATION, 
 				ExifInterface.ORIENTATION_NORMAL);
@@ -121,7 +215,7 @@ public class ImageProcessing {
 
 		return angle;
 	}
-	
+
 	/**
 	 * Read the exif orientation angle from a given file
 	 * @param file The file. 
@@ -129,7 +223,7 @@ public class ImageProcessing {
 	 * @throws IOException if we cannot get an exifInterface from the file
 	 */
 	public static float getExifOrientationAngle(String file)
-			throws IOException{
+	throws IOException{
 
 		// read exif data
 		ExifInterface exif = new ExifInterface(file);
@@ -151,7 +245,7 @@ public class ImageProcessing {
 	 * @param maxThumbnailDimension The maximum thumbnail dimension in either height or width
 	 * @param forceBase2 If we force to downsample by base2, it is faster, but then we can only
 	 * resize by a factor of 2,4,8,16...
-	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL
+	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL. Null if unsuccessful
 	 */
 	public static Bitmap makeThumbnail(
 			final byte[] imageData,
@@ -161,57 +255,68 @@ public class ImageProcessing {
 
 		if (imageData == null || imageData.length == 0)
 			return null;
+		
+		// setup imageData
+		BitmapDecodable<byte[]> decodable = new BitmapDecodable<byte[]>() {
 
-		// determine the size of the image first, so we know at what sample rate to use.
-		BitmapFactory.Options options=new BitmapFactory.Options();
-		options.inJustDecodeBounds = true;
-		BitmapFactory.decodeByteArray(imageData, 0, imageData.length, options);
-		double scale = ((double)Math.max(options.outHeight, options.outWidth))/maxThumbnailDimension;
-
-		// convert to integer scaling ratio to base 2 or not depending on input
-		int intScale = 1;
-		if (forceBase2)
-			intScale = (int)Math.pow(2, Math.ceil(com.tools.MathTools.log2(scale)));
-		else
-			intScale = (int) Math.ceil(scale);
-		if (intScale < 1)
-			intScale = 1;
-
-		// now actually do the resizeing
-		BitmapFactory.Options options2 = new BitmapFactory.Options();
-		options2.inSampleSize = intScale;
-		options2.inDither = true;
-		Bitmap thumbnailBitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.length, options2);
-
-		// determine the rotation angle
-		int angle = 0;
-		switch (exifOrientation){
-		case ExifInterface.ORIENTATION_NORMAL:
-			// do nothing
-			break;
-		case ExifInterface.ORIENTATION_ROTATE_90:
-			angle = 90;
-			break;
-		case ExifInterface.ORIENTATION_ROTATE_180:
-			angle = 180;
-			break;
-		case ExifInterface.ORIENTATION_ROTATE_270:
-			angle = 270;
-			break;
-		}
-
-		// now do the rotation
-		if (angle != 0) {
-			Matrix matrix = new Matrix();
-			matrix.postRotate(angle);
-
-			thumbnailBitmap = Bitmap.createBitmap(thumbnailBitmap, 0, 0, thumbnailBitmap.getWidth(),
-					thumbnailBitmap.getHeight(), matrix, true);
-		}
-
-		return thumbnailBitmap;
+			@Override
+			Bitmap onDecode(Options options) {
+				return BitmapFactory.decodeByteArray(data, 0, data.length, options);
+			}
+		};
+		decodable.setData(imageData);
+		return makeThumbnailHelper(decodable, exifOrientation, maxThumbnailDimension, forceBase2);
 	}
-	
+
+	/**
+	 * Create a bitmap thumbnail from the input full image file. <br>
+	 * Will take into account the exifOrientation, but can only handle rotations, not transposing or inversions. <br>
+	 * This can only rescale by integer amounts. For example if original image is 128x128, and you input
+	 * maxThumbnailDimension as 100, we can only rescale by a factor of 2, so the image will be 64x64. <p>
+	 * *** Also If you input too large of a maxThumbnailDimension, you may crash due to memory overflow ***
+	 * However this is memory intelligent, meaning it doesn't load the whole bitmap into memory and then resize,
+	 * but only sub-samples the image. This is why we can only scale by integer amounts. 
+	 * @param fullImagePath The path to the full image file, we will resize
+	 * @param maxThumbnailDimension The maximum thumbnail dimension in either height or width
+	 * @param forceBase2 If we force to downsample by base2, it is faster, but then we can only
+	 * resize by a factor of 2,4,8,16...
+	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL Null if unsuccessful
+	 * @throws IOException 
+	 */
+	public static Bitmap makeThumbnail(
+			final String fullImagePath,
+			final int maxThumbnailDimension,
+			boolean forceBase2){
+
+		if (fullImagePath == null || fullImagePath.length() == 0)
+			return null;
+		
+		// setup imageData
+		BitmapDecodable<String> decodable = new BitmapDecodable<String>() {
+
+			@Override
+			Bitmap onDecode(Options options) {
+				return BitmapFactory.decodeFile(data, options);
+			}
+		};
+		decodable.setData(fullImagePath);
+		
+		// read orientation
+		ExifInterface exif;
+		try {
+			exif = new ExifInterface(fullImagePath);
+		} catch (IOException e) {
+			Log.e("TAG", Log.getStackTraceString(e));
+			return null;
+		}
+		int orientation = exif.getAttributeInt(
+				ExifInterface.TAG_ORIENTATION, 
+				ExifInterface.ORIENTATION_NORMAL);
+		
+		// make the thumbnail
+		return makeThumbnailHelper(decodable, orientation, maxThumbnailDimension, forceBase2);
+	}
+
 	/** 
 	 * Resize a byte array keeping aspect ratio. Will either
 	 * crop the data, fill extra data with black bars, or resize the image 
@@ -311,13 +416,13 @@ public class ImageProcessing {
 		if (cropFlag == ResizeType.RESIZE_SMALL ||
 				cropFlag == ResizeType.RESIZE_LARGE ||
 				(tmpResizedBitmap.getWidth() == newWidthHeight.width && 
-				tmpResizedBitmap.getHeight() == newWidthHeight.height))
+						tmpResizedBitmap.getHeight() == newWidthHeight.height))
 			resizedBitmap = tmpResizedBitmap;
 
 		// crop option, we will grab a subset of the tmpBitmap
 		else if (cropFlag == ResizeType.CROP){
 			resizedBitmap = Bitmap.createBitmap
-					(newWidthHeight.width, newWidthHeight.height, Bitmap.Config.RGB_565);
+			(newWidthHeight.width, newWidthHeight.height, Bitmap.Config.RGB_565);
 			int[] pixels = new int[resizedBitmap.getWidth()*resizedBitmap.getHeight()];
 			int x = (int) Math.round((tmpResizedBitmap.getWidth() - resizedBitmap.getWidth())/2.0);
 			int y = (int) Math.round((tmpResizedBitmap.getHeight() - resizedBitmap.getHeight())/2.0);
@@ -330,7 +435,7 @@ public class ImageProcessing {
 		// the blackBars option, we create a new bitmap that is larger and fill with tmpBitmap
 		else {
 			resizedBitmap = Bitmap.createBitmap
-					(newWidthHeight.width, newWidthHeight.height, Bitmap.Config.RGB_565);
+			(newWidthHeight.width, newWidthHeight.height, Bitmap.Config.RGB_565);
 			int[] pixels = new int[resizedBitmap.getWidth()*resizedBitmap.getHeight()];
 			int x = (int) -Math.round((tmpResizedBitmap.getWidth() - resizedBitmap.getWidth())/2.0);
 			int y = (int) -Math.round((tmpResizedBitmap.getHeight() - resizedBitmap.getHeight())/2.0);
@@ -343,7 +448,7 @@ public class ImageProcessing {
 		// turn back into byte array
 		return resizedBitmap;	
 	}
-	
+
 	/** Rotate a byte array keeping aspect ratio. 
 	 * @param input Byte array input data
 	 * @param orientationAngle the orientation of the byte array.
@@ -400,7 +505,7 @@ public class ImageProcessing {
 
 		return result;		
 	}
-	
+
 	/**
 	 * Rotate the exif data in a picture by 90 degrees.
 	 * @param filePath The path of the file
@@ -408,7 +513,7 @@ public class ImageProcessing {
 	 * @throws IOException 
 	 */
 	public static void rotateExif(String fileName, int direction)
-			throws IOException{
+	throws IOException{
 
 		// 0 rotation
 		if (direction == 0)
@@ -452,7 +557,7 @@ public class ImageProcessing {
 		EI.setAttribute(ExifInterface.TAG_ORIENTATION, ""+exifOrientation);
 		EI.saveAttributes();
 	}
-	
+
 	/** attempts to save byte data from camera to the next default location on the SDcard. 
 	 * Does not throw any exceptions, but returns success and any exceptions that were
 	 * thrown as strings. Will return filename saved if successful in the reason field.<p>
@@ -558,97 +663,116 @@ public class ImageProcessing {
 
 		return result;
 	}
+
+	/**
+	 * Create a bitmap thumbnail from the input image data. <br>
+	 * Will take into account the exifOrientation, but can only handle rotations, not transposing or inversions. <br>
+	 * This can only rescale by integer amounts. For example if original image is 128x128, and you input
+	 * maxThumbnailDimension as 100, we can only rescale by a factor of 2, so the image will be 64x64. <p>
+	 * *** Also If you input too large of a maxThumbnailDimension, you may crash due to memory overflow ***
+	 * However this is memory intelligent, meaning it doesn't load the whole bitmap into memory and then resize,
+	 * but only sub-samples the image. This is why we can only scale by integer amounts. 
+	 * @param imageData The image data to resize
+	 * @param exifOrientation the exifOrientation tag. If unknown tag, no rotation is assumed. @See ExifOrientation
+	 * @param maxThumbnailDimension The maximum thumbnail dimension in either height or width
+	 * @param forceBase2 If we force to downsample by base2, it is faster, but then we can only
+	 * resize by a factor of 2,4,8,16...
+	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL, null if unsuccessful
+	 */
+	private static Bitmap makeThumbnailHelper(
+			final BitmapDecodable imageData,
+			int exifOrientation,
+			final int maxThumbnailDimension,
+			boolean forceBase2){
+
+		if (imageData == null)
+			return null;
+
+		// determine the size of the image first, so we know at what sample rate to use.
+		BitmapFactory.Options options=new BitmapFactory.Options();
+		options.inJustDecodeBounds = true;
+		imageData.onDecode(options);
+		double scale = ((double)Math.max(options.outHeight, options.outWidth))/maxThumbnailDimension;
+
+		// convert to integer scaling ratio to base 2 or not depending on input
+		int intScale = 1;
+		if (forceBase2)
+			intScale = (int)Math.pow(2, Math.ceil(com.tools.MathTools.log2(scale)));
+		else
+			intScale = (int) Math.ceil(scale);
+		if (intScale < 1)
+			intScale = 1;
+
+		// now actually do the resizeing
+		BitmapFactory.Options options2 = new BitmapFactory.Options();
+		options2.inSampleSize = intScale;
+		options2.inDither = true;
+		Bitmap thumbnailBitmap = imageData.onDecode(options2);
+		if (thumbnailBitmap == null)
+			return null;
+
+		// determine the rotation angle
+		int angle = 0;
+		switch (exifOrientation){
+		case ExifInterface.ORIENTATION_NORMAL:
+			// do nothing
+			break;
+		case ExifInterface.ORIENTATION_ROTATE_90:
+			angle = 90;
+			break;
+		case ExifInterface.ORIENTATION_ROTATE_180:
+			angle = 180;
+			break;
+		case ExifInterface.ORIENTATION_ROTATE_270:
+			angle = 270;
+			break;
+		}
+
+		// now do the rotation
+		if (angle != 0) {
+			Matrix matrix = new Matrix();
+			matrix.postRotate(angle);
+
+			thumbnailBitmap = Bitmap.createBitmap(thumbnailBitmap, 0, 0, thumbnailBitmap.getWidth(),
+					thumbnailBitmap.getHeight(), matrix, true);
+		}
+
+		return thumbnailBitmap;
+	}
 	
 	/**
-	 * Remove the edges of bitmap by extracting the center region that do not match the given nullColor
-	 * @param bitmap the source bitmap
-	 * @param nullColor the color that is considered void and we will chopped. For example, for black simply enter: Color.argb(0, 0, 0, 0); 
-	 * @return The bitmap with the center extracted, or null if null was entered
+	 * Read a picture from the given byte[], return null if unsuffessful <br>
+	 * Make sure to NOT call on main UI thread because it's slow <br>
+	 * Will not do any resizing, so make sure byte[] is actually small
+	 * @param inputData the byte array
+	 * @param angle the rotation angle to rotate the data in the CW direction
+	 * @return the bitmap The bitmap returned, or null if unsuccessful
 	 */
-	public static Bitmap bitmapExtractCenter(Bitmap bitmap, int nullColor){
+	public static Bitmap getThumbnail(
+			byte[] inputData,
+			float angle){
 		
-		// null
-		if (bitmap == null)
+		// open the path if it exists
+		if (inputData != null && inputData.length != 0){
+
+			// read the bitmap
+			Bitmap bmp = BitmapFactory.decodeByteArray(inputData, 0, inputData.length);
+			if (bmp == null)
+				return bmp;
+
+			// now do the rotation
+			if (angle != 0) {
+				Matrix matrix = new Matrix();
+				matrix.postRotate(angle);
+
+				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+						bmp.getHeight(), matrix, true);
+			}
+			
+			return bmp;
+		}
+		else	
 			return null;
-
-		// measure size
-		final int width = bitmap.getWidth();
-		final int height = bitmap.getHeight();
-
-		// grab pixel data
-		int[] pixels = new int[width*height];
-		bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
-
-		// which row will we start and end and cols as well
-		int rowStart = 0;
-		int rowEnd = height-1;
-		int colStart = 0;
-		int colEnd = width-1;
-
-		// find the top that we can crop
-		boolean outerBreak = false;
-		for (int i = 0; i <height; i++){
-			int ii = i*width;
-			for (int j = 0; j < width; j++){				
-				if (pixels[ii + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			rowStart++;
-		}
-
-		// find the bottom that we can crop
-		outerBreak = false;
-		for (int i = height-1; i >= 0; i--){
-			int ii = i*width;
-			for (int j = 0; j < width; j++){
-				if (pixels[ii + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			rowEnd--;
-		}
-
-		// find the left we can crop
-		outerBreak = false;
-		for (int j = 0; j < width; j++){
-			for (int i = 0; i <height; i++){	
-				if (pixels[i*width + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			colStart++;
-		}
-
-		// find the right that we can crop
-		outerBreak = false;
-		for (int j = width-1; j >= 0; j--){
-			for (int i = 0; i <height; i++){	
-				if (pixels[i*width + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			colEnd--;
-		}
-
-		// sub index of matrix
-		int newWidth = colEnd-colStart+1;
-		int newHeight = rowEnd-rowStart+1;
-		if (newWidth <= 0 || newHeight <= 0)
-			return null;
-		return Bitmap.createBitmap(bitmap, colStart, rowStart, newWidth, newHeight);	
 	}
 
 	/**
@@ -671,5 +795,13 @@ public class ImageProcessing {
 		 * Actually resize the data to match the smallest dimension
 		 */
 		RESIZE_SMALL;
+	}
+
+	private static abstract class BitmapDecodable<DATA_TYPE>{
+		DATA_TYPE data;
+		abstract Bitmap onDecode(BitmapFactory.Options options);
+		void setData(DATA_TYPE data){
+			this.data = data;
+		}
 	}
 }

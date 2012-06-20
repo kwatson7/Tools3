@@ -251,85 +251,16 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	}
 
 	/**
-	 * Read a picture from the given byte[], return null if unsuffessful <br>
-	 * Make sure to NOT call on main UI thread because it's slow <br>
-	 * Will be properly rotated based on exif data stored in image
-	 * @param inputData the byte array
-	 * @param angle the rotation angle to rotate the data
-	 * @return the bitmap
-	 */
-	public static Bitmap getThumbnail(
-			byte[] inputData,
-			float angle){
-		// open the path if it exists
-		if (inputData != null && inputData.length != 0){
-
-			// read the bitmap
-			Bitmap bmp = BitmapFactory.decodeByteArray(inputData, 0, inputData.length);
-			if (bmp == null)
-				return bmp;
-
-			// now do the rotation
-			if (angle != 0) {
-				Matrix matrix = new Matrix();
-				matrix.postRotate(angle);
-
-				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
-						bmp.getHeight(), matrix, true);
-			}
-			return bmp;
-		}
-		else	
-			return null;
-	}
-
-	/**
-	 * Read a picture from the given path, return null if unsuffessful <br>
-	 * Make sure to NOT call on main UI thread because it's slow <br>
-	 * Will be properly rotated based on exif data stored in image
-	 * @param path
-	 * @return the bitmap
-	 */
-	public static Bitmap getThumbnail(String path){
-		try{
-			// open the path if it exists
-			if (path != null && path.length() != 0 && (new File(path)).exists()){
-
-				// read the bitmap
-				Bitmap bmp = BitmapFactory.decodeFile(path);
-				if (bmp == null)
-					return bmp;
-
-				// now do the rotation
-				float angle =  ImageProcessing.getExifOrientationAngle(path);
-				if (angle != 0) {
-					Matrix matrix = new Matrix();
-					matrix.postRotate(angle);
-
-					bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
-							bmp.getHeight(), matrix, true);
-				}
-				return bmp;
-			}
-			else	
-				return null;
-		}catch(IOException e){
-			Log.e(LOG_TAG, Log.getStackTraceString(e));
-			return null;
-		}
-	}	
-
-	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
 	 * Make sure to NOT call on main UI thread because it's slow <br>
 	 * Will be properly rotated based on exif data stored in image. This is getThumbnail, because if it's a full size image, we will probably crash when rotating. <br>
 	 * Warning this decodes and re-encodes the file
 	 * @param path The path to the image
-	 * @param imageQuality The imagequality to re-encode file
+	 * @param imageQuality The image quality to re-encode file
 	 * @return the byte array
 	 */
 	public static byte[] getThumbnailAsByteArray(String path, int imageQuality){
-		Bitmap bmp = getThumbnail(path);
+		Bitmap bmp = com.tools.Tools.getThumbnail(path);
 		if (bmp == null)
 			return null;
 

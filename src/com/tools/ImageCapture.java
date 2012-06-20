@@ -217,7 +217,7 @@ public class ImageCapture {
 		if (path != null && path.length() > 0){
 			File file = new File(path);
 			if (file.exists()){
-				Bitmap bmp = com.tools.Tools.getThumbnail(path, maxPixelSize, true);
+				Bitmap bmp = com.tools.ImageProcessing.makeThumbnail(path, maxPixelSize, true);
 				// delete the file
 				if (deleteFile)
 					file.delete();
