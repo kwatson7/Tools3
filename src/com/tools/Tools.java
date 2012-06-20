@@ -1,6 +1,5 @@
 package com.tools;
 
-import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -37,14 +36,12 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
-import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Debug;
 import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
-import android.provider.MediaStore.MediaColumns;
 import android.telephony.SmsManager;
 import android.telephony.TelephonyManager;
 import android.text.Html;
@@ -53,13 +50,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
 /**
  * @author Kyle Watson
  *
  */
 public class Tools {
+
 	//TODO: class not commented
 	// static variables for use in methods
 	/** SMS field to be inserted as a received message */
@@ -74,171 +71,28 @@ public class Tools {
 	public static final String OPTION = "OPTION";
 	/** field where sms receivers store the number of texts sent */
 	public static final String NUM_MESSAGES = "NUM_MESSAGES";
-	/** The prefereed buffer size for writting input streams to file */
+	/** The preferred buffer size for writing input streams to file */
 	public static final int BUFFER_SIZE = 1024;
 	private static final String LOG_TAG = "Tools";
 
-	/** Take input of original Size object that must fit within fitSize 
-	 * and output new size that preserves aspect ratio with no cropping.*
-	 * @param originalSize WidthHeight object of original size object
-	 * @param fitSize WidthHeight object that the new object must fit into
-	 * @return a WidthHeight object that is the new size
+	/**
+	 * Get a filename from a given uri
+	 * @param cr A content resolver required to query the database
+	 * @param uri The uri we will query
+	 * @return The filename found in the given ur, or null if none.
 	 */
-	public static WidthHeight fitNoCrop(WidthHeight originalSize, WidthHeight fitSize){
+	public static String getFileNameUri(ContentResolver cr, Uri uri){
 
-		WidthHeight result = null;
-		// width hits edge first
-		if (originalSize.getAspectRatio() >= fitSize.getAspectRatio()){
-
-			result = new WidthHeight(fitSize.width, Math.round(fitSize.width/originalSize.getAspectRatio()));
-
-			// height hits edge first	
-		}else{
-			result = new WidthHeight(Math.round(fitSize.height*originalSize.getAspectRatio()), fitSize.height);
-		}
-
-		return result;
-	}
-
-	/** Take input of original Size object that must fit within fitSize 
-	 * and output new size that preserves aspect ratio butt can make 
-	 * image larger that fitSize that then must be cropped.
-	 * @param originalSize WidthHeight object of original size object
-	 * @param fitSize WidthHeight object that the new object must fit into
-	 * @return a WidthHeight object that is the new size
-	 */
-	public static WidthHeight fitCrop(WidthHeight originalSize, WidthHeight fitSize){
-
-		WidthHeight result = null;
-		// height hits edge first
-		if (originalSize.getAspectRatio() < fitSize.getAspectRatio()){
-
-			result = new WidthHeight(fitSize.width, Math.round(fitSize.width/originalSize.getAspectRatio()));
-
-			// height hits edge first	
-		}else{
-			result = new WidthHeight(Math.round(fitSize.height*originalSize.getAspectRatio()), fitSize.height);
-		}
-
-		return result;
-	}
-
-	/** attempts to save byte data from camera to the next default location on the SDcard. 
-	 * Does not throw any exceptions, but returns success and any exceptions that were
-	 * thrown as strings. Will return filename saved if successful.<p>
-	 * make sure to put this in your manifest:<br>
-	 * <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-	 * @param ctx Context where various android data is pulled from, usually getApplicationContext
-	 * @param data Byte array of data to be stored
-	 * @param caption Caption to be stored for picture file. (not used at teh moment)
-	 * @param displayToast Boolean to display toast message
-	 * @param fileNameInput write data to this filename. If null, then writes to next available file on external storage
-	 * @param exifOrientation the orientation to store in exif header. See ExifInterface for details. Input null to not save anything.
-	 * @param showImageInScanner boolean to show the image in the media scanner. Usually true
-	 * */
-	public static SuccessReason saveByteDataToFile(
-			Context ctx, 
-			byte[] data, 
-			String caption, 
-			Boolean displayToast, 
-			String fileNameInput,
-			Integer exifOrientation,
-			boolean showImageInScanner){
-
-		//TODO: save correct gps data
-		//TODO: this whole method needs to be cleaned up
-		//TODO: actually store caption
-
-		// initialize result and fileName
-		SuccessReason result = new SuccessReason(true);
-		String fileName = "";
-
-		// try catch wrapper over entire class
-		try{
-			// create values to store in file, just type and date
-			ContentValues values = new android.content.ContentValues(2);
-			values.put(MediaColumns.DATE_ADDED, System.currentTimeMillis()); 
-			values.put(MediaColumns.MIME_TYPE, "image/jpeg");
-
-			// store into database
-			Uri uriTarget = null;
-			if (fileNameInput == null){
-				uriTarget = ctx.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-
-				// grab filename
-				fileName = getFileNameUri(ctx, uriTarget);
-			}else
-				fileName = fileNameInput;
-			
-			// write the folders
-			com.tools.Tools.writeRequiredFolders(fileName);
-
-			// write file
-			FileOutputStream imageFileOS = null;
-			try {
-				if (fileNameInput==null)
-					imageFileOS = (FileOutputStream) ctx.getContentResolver().openOutputStream(uriTarget);
-				else{
-					try{
-						imageFileOS = ctx.openFileOutput(fileNameInput, Context.MODE_WORLD_WRITEABLE);
-					}catch (Exception e) {
-						// likely had a file separator, so just write directly to that
-						imageFileOS = new FileOutputStream(fileNameInput);
-					}
-				}
-				imageFileOS.write(data);
-				imageFileOS.flush();
-				imageFileOS.close();
-
-				// display toast
-				if (displayToast)
-					Toast.makeText(ctx,
-							"Image saved: " + fileName,
-							Toast.LENGTH_LONG).show();
-
-				// error catch	
-			} catch (FileNotFoundException e) {
-				result = new SuccessReason(false, result.getReason()+" "+e.getLocalizedMessage());
-			} catch (IOException e) {
-				result = new SuccessReason(false, result.getReason()+" "+e.getLocalizedMessage());
-			}
-
-			// add orientation data and/or gps
-			try{
-				if (exifOrientation != null){
-					ExifInterface EI = new ExifInterface(fileName);
-					EI.setAttribute(ExifInterface.TAG_ORIENTATION, ""+exifOrientation);
-					//EI.setAttribute(ExifInterface.TAG_GPS_LATITUDE, Tools.convertAngletoString(15.42));
-					//EI.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, "12/1,2/1,300/100");
-					//EI.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, "N");
-					//EI.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, "E");
-					EI.saveAttributes();
-				}
-
-			}catch(Exception e){
-				result = new SuccessReason(false, result.getReason()+" "+e.toString());
-			}	
-
-			if (showImageInScanner)
-				MediaScannerConnection.scanFile(ctx, new String[] {fileName}, new String[] {"image/jpeg"}, null);
-		}catch(Exception e){
-			result = new SuccessReason(false, result.getReason()+" "+e.toString());
-		}
-
-		// no exceptions then success
-		if (result.getReason().length()==0)
-			result = new SuccessReason(true, fileName);
-
-		return result;
-	}
-
-	public static String getFileNameUri(Context ctx, Uri uri){
-
-		String[] projection = { MediaStore.Images.ImageColumns.DATA,
+		// what columns we will extract
+		String[] projection = {
+				MediaStore.Images.ImageColumns.DATA,
 				MediaStore.Images.ImageColumns.DISPLAY_NAME}; 
 
+		// query the uri
 		String result = null;
-		Cursor cur = ctx.getContentResolver().query(uri, projection, null, null, null); 
+		Cursor cur = cr.query(uri, projection, null, null, null); 
+
+		// read the filename
 		if (cur!=null && cur.moveToFirst()) { 
 			result = cur.getString(0); 
 		} 
@@ -248,6 +102,15 @@ public class Tools {
 		return result;
 	} 
 
+	/**
+	 * Convert an angle to a string formatted as follows: <br>
+	 * deg/1,min/1,sec*1000/1000, for example,
+	 * 15.246 as an input would yield: <br>
+	 * "15/1,14/1,45600/1000" <br>
+	 * This is needed to properly store gps info in exif headers of images
+	 * @param angle
+	 * @return
+	 */
 	public static String convertAngletoString(double angle){
 
 		int deg;
@@ -257,18 +120,28 @@ public class Tools {
 		deg = (int) angle;
 		min = (int) ((angle - deg)*60);
 		sec = (int) ((angle - (deg + min/60.0))*3600);
-		return deg+"/1,"+min+"/1,"+sec*100+"/100";
+		return deg+"/1,"+min+"/1,"+sec*1000+"/1000";
 	}
 
-	/** Grab phones full number, see getMyStrippedPhoneNumber for removing +1*/
+	/**
+	 * Grab phones full number
+	 * @param act Activity required to get he phone number
+	 * @return The phone number of the phone, null if none found.
+	 * @See getMyStrippedPhoneNumber for removing +1
+	 */
 	public static String getMyPhoneNumber(Activity act){  
 		TelephonyManager mTelephonyMgr;  
 		mTelephonyMgr = (TelephonyManager)  
-		act.getSystemService(Context.TELEPHONY_SERVICE);   
+				act.getSystemService(Context.TELEPHONY_SERVICE);   
 		return mTelephonyMgr.getLine1Number(); 
 	}  
 
-	/** Grab phone number with leading +1 removed... if there */
+	/**
+	 * Grab phone number with leading +1 removed... if there
+	 * @param act Activity required to get the phone number
+	 * @return The phone number with +1 stripped 
+	 * @See getMyPhoneNumber to not strip +1
+	 */
 	public static String getMyStrippedPhoneNumber(Activity act){  
 		String s = getMyPhoneNumber(act); 
 
@@ -287,39 +160,47 @@ public class Tools {
 		return s; 
 	}
 
-	/** Eliminate all but numerics from a string*/
+	/**
+	 * Eliminate all but numerics from a string, and returns a new string. The original is unaffected
+	 * @param input The original string
+	 * @return new string with only numerics present
+	 */
 	public static String keepOnlyNumerics(String input){
-		return input.replaceAll("[^0-9]", "");
+		if (input == null)
+			return input;
+
+		// copy the string
+		String working = new String(input);
+		return working.replaceAll("[^0-9]", "");
 	}
 
-	/** Format phone number to 123-456-7890.
-	 * If it cannot be formatted this way, then simply
-	 * the incoming string is returned */
+	/**
+	 * Format phone number to 234-567-8910.
+	 * If it cannot be formatted this way, then simply a copy of the
+	 * incoming string is returned. Original string is not affected
+	 * @param input the input string to format
+	 * @return The formatted string
+	 */
 	public static String formatPhoneNumber(String input){
 
-		String out = input;
+		// put as only numeric phone number
+		String out = fixPhoneString(input);
 
-		if (out == null || out.length() == 0)
-			return out;
-		// strip off 1 and +
-		if (out.charAt(0) == '+')
-			out = out.substring(1);
-		if (out.length() == 0)
-			return out;
-		if (out.charAt(0) == '1')
-			out = out.substring(1);
-
-		out = keepOnlyNumerics(out);
+		// add in - or nothing at all
 		if (out.length() != 10)
-			out = input;
+			out = new String(input);
 		else
 			out = out.substring(0, 3)+"-"+out.substring(3, 6)+"-"+out.substring(6);
 
 		return out;
 	}
 
-	/** get the string indicated by the tag in the given xml string
-	 * Return null if not found*/
+	/**
+	 * get the string indicated by the tag in the given xml string
+	 * @param xml the xml string to parse
+	 * @param tag The tag we are looking for
+	 * @return The string at the tag, null if not found or any inputs are null
+	 */
 	public static String getXmlValueAtTag(String xml, String tag){
 
 		// null inputs
@@ -371,279 +252,15 @@ public class Tools {
 		imm.showSoftInput(view, 0);
 	}
 
-	/** Resize a byte array keeping aspect ratio. Will either
-	 * crop the data, fill extra data with black bars, or resize the image 
-	 * to as close to newWidthHeight, but not guaranteed.
-	 * @author Kyle Watson
-	 * @param input Byte array input data
-	 * @param cropFlag "crop", "blackBars", "resizeLarge", "resizeSmall" options for what 
-	 * to do with image that doesn't fit new size. 
-	 * @param ctx Context context, usually getApplicationContext,
-	 * if null, then we cannot find orientation angle from inside byte array
-	 * @param newWidthHeight New desired width and height
-	 * @param orientationAngle Float for the orientation of the byte array. If the data
-	 * is already stored in the byte array, then pass null and the value will be extracted.
-	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
-	 * @throws IllegalArgumentException if cropFlag is not the right input type
-	 */
-	public static byte[] resizeByteArray(byte[] input, 
-			WidthHeight newWidthHeight, 
-			String cropFlag, 
-			Context ctx, 
-			Float orientationAngle,
-			int imageQuality) 
-	throws IllegalArgumentException{
-
-		// grab orientation angle from exif data
-		if (orientationAngle == null && ctx != null)
-			orientationAngle = getExifOrientationAngle(input, ctx);
-		if (orientationAngle == null)
-			orientationAngle = 0f;
-
-		// create bitmap from data
-		BitmapFactory.Options opt = new BitmapFactory.Options();
-		opt.inDither = true;
-		Bitmap bitmapOrg = BitmapFactory.decodeByteArray(input, 0, input.length, opt);
-
-		// grab width and height from bitmap
-		int width = bitmapOrg.getWidth();
-		int height = bitmapOrg.getHeight();
-
-		// check rotation to see if we need to switch width and height
-		if ((int) Math.round(orientationAngle) % (int) 180 == 90){
-			int tmp = width;
-			width = height;
-			height = tmp;
-		}
-
-		// check if no resizing required
-		if (width == newWidthHeight.width && height == newWidthHeight.height && 
-				orientationAngle == 0)
-			return input;
-
-		// find new width and height for temporary bitmap object
-		WidthHeight tmpWidthHeight = null;
-		if (cropFlag.compareToIgnoreCase("crop")==0 ||
-				cropFlag.compareToIgnoreCase("resizeLarge")==0)
-			tmpWidthHeight = com.tools.Tools.fitCrop
-			(new WidthHeight(width, height), newWidthHeight);
-		else if (cropFlag.compareToIgnoreCase("blackBars")==0 || 
-				cropFlag.compareToIgnoreCase("resizeSmall")==0)
-			tmpWidthHeight = com.tools.Tools.fitNoCrop
-			(new WidthHeight(width, height), newWidthHeight);
-		else
-			throw new IllegalArgumentException
-			("resizeByteArray cropFlag must have \"crop\", \"blackBars\", \"resizeLarge\", or \"resizeSmall\" as an input");
-
-		// grab height and width
-		int newWidth = tmpWidthHeight.width;
-		int newHeight = tmpWidthHeight.height;
-
-		// calculate the scale
-		float scaleWidth = ((float) newWidth) / width;
-		float scaleHeight = ((float) newHeight) / height;
-
-		// create a matrix for the manipulation
-		Matrix matrix = new Matrix();
-		// resize the bit map
-		matrix.postScale(scaleWidth, scaleHeight);
-		// set rotation angle based on exif data
-		if (orientationAngle != 0)
-			matrix.postRotate(orientationAngle);
-
-		// check rotation to see if we need to switch back to original width and height
-		if ((int) Math.round(orientationAngle) % (int) 180 == 90){
-			int tmp = width;
-			width = height;
-			height = tmp;
-		}
-
-		// recreate the new Bitmap
-		Bitmap tmpResizedBitmap = Bitmap.createBitmap(bitmapOrg, 0, 0,
-				width, height, matrix, true);
-
-		Bitmap resizedBitmap = null;
-
-		// if resizeSmall or resizeLarge, then tmpResizedBitmap is the same as final.
-		// Also if the desired output is the same as the tmpSize then, also just copy over
-		if (cropFlag.compareToIgnoreCase("resizeSmall")==0 ||
-				cropFlag.compareToIgnoreCase("resizeLarge")==0 ||
-				(tmpResizedBitmap.getWidth() == newWidthHeight.width && 
-						tmpResizedBitmap.getHeight() == newWidthHeight.height))
-			resizedBitmap = tmpResizedBitmap;
-
-		// crop option, we will grab a subset of the tmpBitmap
-		else if (cropFlag.compareToIgnoreCase("crop")==0){
-			resizedBitmap = Bitmap.createBitmap
-			(newWidthHeight.width, newWidthHeight.height, Bitmap.Config.RGB_565);
-			int[] pixels = new int[resizedBitmap.getWidth()*resizedBitmap.getHeight()];
-			int x = (int) Math.round((tmpResizedBitmap.getWidth() - resizedBitmap.getWidth())/2.0);
-			int y = (int) Math.round((tmpResizedBitmap.getHeight() - resizedBitmap.getHeight())/2.0);
-			tmpResizedBitmap.getPixels(pixels, 0, resizedBitmap.getWidth(), x, y, 
-					resizedBitmap.getWidth(), resizedBitmap.getHeight());
-			resizedBitmap.setPixels(pixels, 0, resizedBitmap.getWidth(), 0, 0, 
-					resizedBitmap.getWidth(), resizedBitmap.getHeight());
-		}
-
-		// the blackBars option, we create a new bitmap that is larger and fill with tmpBitmap
-		else {
-			resizedBitmap = Bitmap.createBitmap
-			(newWidthHeight.width, newWidthHeight.height, Bitmap.Config.RGB_565);
-			int[] pixels = new int[resizedBitmap.getWidth()*resizedBitmap.getHeight()];
-			int x = (int) -Math.round((tmpResizedBitmap.getWidth() - resizedBitmap.getWidth())/2.0);
-			int y = (int) -Math.round((tmpResizedBitmap.getHeight() - resizedBitmap.getHeight())/2.0);
-			tmpResizedBitmap.getPixels(pixels, 0, tmpResizedBitmap.getWidth(), 0, 0, 
-					tmpResizedBitmap.getWidth(), tmpResizedBitmap.getHeight());
-			resizedBitmap.setPixels(pixels, 0, tmpResizedBitmap.getWidth(), x, y, 
-					tmpResizedBitmap.getWidth(), tmpResizedBitmap.getHeight());
-		}
-
-		// turn back into byte array
-		ByteArrayOutputStream out = new ByteArrayOutputStream(resizedBitmap.getWidth()*resizedBitmap.getHeight());
-		resizedBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
-		byte[] result = out.toByteArray();
-
-		return result;		
-	}
-
-	/** Rotate a byte array keeping aspect ratio. 
-	 * @param input Byte array input data
-	 * @param ctx Context context, usually getApplicationContext
-	 * @param orientationAngle Float for the orientation of the byte array. If the data
-	 * is already stored in the byte array, then pass null and the value will be extracted.
-	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
-	 * @throws IllegalArgumentException if cropFlag is not the right input type
-	 */
-	public static byte[] rotateByteArray(
-			byte[] input, 
-			Context ctx, 
-			Float orientationAngle,
-			int imageQuality){
-
-		// grab orientation angle from exif data
-		if (orientationAngle == null)
-			orientationAngle = getExifOrientationAngle(input, ctx);
-
-		// create bitmap from data
-		BitmapFactory.Options opt = new BitmapFactory.Options();
-		opt.inDither = true;
-		Bitmap bitmapOrg = BitmapFactory.decodeByteArray(input, 0, input.length, opt);
-
-		// grab width and height from bitmap
-		int width = bitmapOrg.getWidth();
-		int height = bitmapOrg.getHeight();
-
-		// check rotation to see if we need to switch width and height
-		if ((int) Math.round(orientationAngle) % (int) 180 == 90){
-			int tmp = width;
-			width = height;
-			height = tmp;
-		}
-
-		// check if no rotating required
-		if (orientationAngle == 0)
-			return input;
-
-		// create a matrix for the manipulation
-		Matrix matrix = new Matrix();
-
-		// set rotation angle based on exif data
-		if (orientationAngle != 0)
-			matrix.postRotate(orientationAngle);
-
-		// check rotation to see if we need to switch back to original width and height
-		if ((int) Math.round(orientationAngle) % (int) 180 == 90){
-			int tmp = width;
-			width = height;
-			height = tmp;
-		}
-
-		// recreate the new Bitmap
-		Bitmap resizedBitmap = Bitmap.createBitmap(bitmapOrg, 0, 0,
-				width, height, matrix, true);
-
-		// turn back into byte array
-		ByteArrayOutputStream out = new ByteArrayOutputStream(resizedBitmap.getWidth()*resizedBitmap.getHeight());
-		resizedBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, out);   
-		byte[] result = out.toByteArray();
-
-		return result;		
-	}
-
-
-	public static ExifInterface readExifDataFromByteArray(byte[] data, Context ctx){
-
-		// write data to file
-		SuccessReason tmp = saveByteDataToFile(ctx, data, "", false, null, null, true);//, tmpFile);
-		if (!tmp.getSuccess())
-			return null;
-		String tmpFile = tmp.getReason();
-
-		// read exif data from file
-		ExifInterface exif;
-		try {
-			exif = new ExifInterface(tmpFile);
-		} catch (IOException e) {
-			exif = null;
-		}
-
-		// delete file
-		new File(tmpFile).delete();
-
-		return exif;
-	}
-
-	public static float getExifOrientationAngle(ExifInterface exif){
-
-		// null exif, return 0 angle
-		if (exif==null)
-			return 0;
-
-		// read orienation
-		int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 
-				ExifInterface.ORIENTATION_NORMAL);
-
-		// these are the angle corresponding to these orientations
-		float angle = 0;
-		if (orientation == ExifInterface.ORIENTATION_ROTATE_90)
-			angle = 90;
-		else if (orientation == ExifInterface.ORIENTATION_ROTATE_180)
-			angle = 180;
-		else if (orientation == ExifInterface.ORIENTATION_ROTATE_270)
-			angle = 270;
-
-		return angle;
-	}
-
-	public static float getExifOrientationAngle(byte[] data, Context ctx){
-
-		// read exif from byte array and then read the angle data
-		return getExifOrientationAngle(readExifDataFromByteArray(data, ctx));
-	}
-
-	public static float getExifOrientationAngle(String file){
-
-		// read exif data
-		ExifInterface exif = null;
-		try {
-			exif = new ExifInterface(file);
-		} catch (IOException e) {
-		}
-		//TODO: handle this exception
-
-		// grab the angle from exif data
-		return getExifOrientationAngle(exif);
-	}
-
 	/**
 	 * Send an sms message. If message is empty or null, or if the phoneNumber is empty or null,
 	 *  then nothing happens and simply returns. Can send multi-part messages > 160 characters.
-	 *  To pick up action on the receive and delivered put this code in you main context. Also
+	 *  To pick up action on the receive and delivered put the following code in you main context. Also
 	 *  make sure that the receivers are only turned on once, and turned off when not needed 
 	 *  anymore else, they will be called over and over. Any user info is stored in the broadcast intents
 	 *  under com.tools.Tools.OPTION, and the total number of texts sent (for multi-part-texts) is saved
 	 *  under com.tools.Tools.NUM_MESSAGES.
-	 *  * <pre>
+	 *  <pre>
 	 * {@code
 	 * ctx.registerReceiver(new BroadcastReceiver(){ ... }, new IntentFilter(com.tools.Tools.SENT));
 	 * ctx.registerReceiver(new BroadcastReceiver(){ ... }, new IntentFilter(com.tools.Tools.DELIVERED));
@@ -754,15 +371,16 @@ public class Tools {
 	}
 
 	/**
-	 * Insert a message
+	 * Insert a message into the sms database
 	 * @param ctx The context to use to perform this action
 	 * @param phoneNumber The phone number attached to the sms
 	 * @param message The message of the sms
 	 * @param messageType the message is either sent (com.tools.Toos.MESSAGE_TYPE_SENT) 
 	 * or received (com.tools.Tools.MESSAGE_TYPE_INBOX)
-	 * @return The url of the sms database in which the message was inserted
+	 * @return The url of the sms database in which the message was inserted. Null if error occured
 	 */
-	public static Uri insertSMSDatabse(Context ctx,
+	public static Uri insertSMSDatabse(
+			Context ctx,
 			String phoneNumber, 
 			String message, 
 			int messageType){
@@ -783,6 +401,7 @@ public class Tools {
 		// grab current data
 		Date date = new Date();
 
+		// fill the values
 		ContentValues values = new ContentValues(); 
 		values.put(ADDRESS, phoneNumber); 
 		values.put(DATE, String.valueOf(date.getTime())); 
@@ -793,34 +412,30 @@ public class Tools {
 		Uri inserted = null;
 		try{
 			inserted = ctx.getContentResolver().insert
-			(Uri.parse("content://sms//sent"), values);
+					(Uri.parse("content://sms//sent"), values);
 		}catch(Exception e){
-			e.printStackTrace();
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
 		}
 
 		return inserted;
 	}
 
-	private class SmsSentClass extends Activity {
-
-		@Override
-		protected void onCreate(Bundle savedInstanceState){
-			int kyle = 6;
-		}
-	}
-
-	/** Show a dialog that will only be shown once at startup. 
+	/**
+	 * Show a dialog that will only be shown once at startup. 
 	 * @param ctx The context where this dialog will be displayed
 	 * @param welcomeScreenShownPref The string where the preference is stored
 	 * @param title The title of the box
 	 * @param text The text in the body
 	 * @param toShow Boolean whether to show or not. Input null to read from preferences
 	 */
-	public static void showOneTimeDialog(Context ctx,
+	public static void showOneTimeDialog(
+			Context ctx,
 			String welcomeScreenShownPref,
 			String title,
 			String text, 
 			Boolean toShow){
+
+		// open the prefs
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
 
 		// second argument is the default to use if the preference can't be found
@@ -842,7 +457,7 @@ public class Tools {
 			if (prefs != null){
 				SharedPreferences.Editor editor = prefs.edit();
 				editor.putBoolean(welcomeScreenShownPref, true);
-				editor.commit(); // Very important to save the preference
+				editor.commit();
 			}
 		}
 	}
@@ -855,7 +470,8 @@ public class Tools {
 	 * @param groupName The group name, fore example "friends"
 	 * @return The group ID is returned
 	 */
-	public static String makeNewGroup(Context ctx,
+	public static String makeNewGroup(
+			Context ctx,
 			String accountType,
 			String accountName,
 			String groupName){
@@ -956,13 +572,13 @@ public class Tools {
 				}
 			}
 		}catch(Exception e){
-			e.printStackTrace();
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
 		}
 	}
 
 	/**
 	 * Take string as input (a phone number) and pull off all non numeric characters and any leading 1 or +
-	 * @param input
+	 * @param input the input phone number, if null, null will be output
 	 * @return The only numeric phone number
 	 */
 	public static String fixPhoneString(String input){
@@ -1050,6 +666,7 @@ public class Tools {
 		}
 		return builder.toString();
 	}
+
 	/**
 	 *  Parse a string into an arraylist separating by delimiter
 	 *  @param listString the string to parse 
@@ -1071,87 +688,6 @@ public class Tools {
 		}
 
 		return array;
-	}
-
-	/**
-	 * Create a byte array thumbnail from the input image byte array. <br>
-	 * Will take into account the exifOrientation, but can only handle rotations, not transposing or inversions. <br>
-	 * This can only rescale by integer amounts. For example if original image is 128x128, and you input
-	 * maxThumbnailDimension as 100, we can only rescale by a factor of 2, so the image will be 64x64. <p>
-	 * *** Also If you input too large of a maxThumbnailDimension, you may crash due to memory overflow ***
-	 * However this is memory intelligent, meaning it doesn't load the whole bitmap into memory and then resize,
-	 * but only sub-samples the image. This is why we can only scale by integer amounts. 
-	 * @param imageData The image data to resize
-	 * @param exifOrientation the exifOrientation tag. If unknown tag, no rotation is assumed. @See ExifOrientation
-	 * @param maxThumbnailDimension The maximum thumbnail dimension in either height or width
-	 * @param forceBase2 If we force to downsample by base2, it is faster, but then we can only
-	 * resize by a factor of 2,4,8,16...
-	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
-	 * @return The resized and rotated thumbnail. So the new orientation tag is ExifInterface.ORIENTATION_NORMAL
-	 */
-	public static byte[] makeThumbnail(
-			final byte[] imageData,
-			int exifOrientation,
-			final int maxThumbnailDimension,
-			boolean forceBase2,
-			int imageQuality){
-
-		if (imageData == null || imageData.length == 0)
-			return null;
-
-		// determine the size of the image first, so we know at what sample rate to use.
-		BitmapFactory.Options options=new BitmapFactory.Options();
-		options.inJustDecodeBounds = true;
-		BitmapFactory.decodeByteArray(imageData, 0, imageData.length, options);
-		double scale = ((double)Math.max(options.outHeight, options.outWidth))/maxThumbnailDimension;
-
-		// convert to integer scaling ratio to base 2 or not depending on input
-		int intScale = 1;
-		if (forceBase2)
-			intScale = (int)Math.pow(2, Math.ceil(com.tools.MathTools.log2(scale)));
-		else
-			intScale = (int) Math.ceil(scale);
-		if (intScale < 1)
-			intScale = 1;
-
-		// now actually do the resizeing
-		BitmapFactory.Options options2 = new BitmapFactory.Options();
-		options2.inSampleSize = intScale;
-		Bitmap thumbnailBitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.length, options2);
-
-		// determine the rotation angle
-		int angle = 0;
-		switch (exifOrientation){
-		case ExifInterface.ORIENTATION_NORMAL:
-			// do nothing
-			break;
-		case ExifInterface.ORIENTATION_ROTATE_90:
-			angle = 90;
-			break;
-		case ExifInterface.ORIENTATION_ROTATE_180:
-			angle = 180;
-			break;
-		case ExifInterface.ORIENTATION_ROTATE_270:
-			angle = 270;
-			break;
-		}
-
-		// now do the rotation
-		if (angle != 0) {
-			Matrix matrix = new Matrix();
-			matrix.postRotate(angle);
-
-			thumbnailBitmap = Bitmap.createBitmap(thumbnailBitmap, 0, 0, thumbnailBitmap.getWidth(),
-					thumbnailBitmap.getHeight(), matrix, true);
-		}
-
-		// convert back to byte array.
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();  
-		thumbnailBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, baos);
-		byte[] byteArray = baos.toByteArray();
-
-		// return result
-		return byteArray;
 	}
 
 	/**
@@ -1205,66 +741,6 @@ public class Tools {
 	}
 
 	/**
-	 * Rotate the exif data in a picture by 90 degrees.
-	 * @param filePath The path of the file
-	 * @param direction any negative number for ccw, any positive for cw, and 0 does nothing
-	 * @throws IOException 
-	 */
-	public static void rotateExif(String fileName, int direction){
-
-		// 0 rotation
-		if (direction == 0)
-			return;
-
-		ExifInterface EI;
-		try {
-			EI = new ExifInterface(fileName);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-			return;
-		}
-
-		// get the angle
-		float angle = getExifOrientationAngle(fileName);
-
-		// rotate the angle
-		if (direction < 0)
-			angle = angle - 90;
-		else
-			angle = angle + 90;
-
-		// modulate by 360
-		while (angle < 0)
-			angle += 360;
-		angle = angle % 360;
-
-		// determine the rotation angle
-		int exifOrientation = ExifInterface.ORIENTATION_UNDEFINED;
-		switch ((int)angle){
-		case 0:
-			exifOrientation = ExifInterface.ORIENTATION_NORMAL;
-			break;
-		case 90:
-			exifOrientation = ExifInterface.ORIENTATION_ROTATE_90;
-			break;
-		case 180:
-			exifOrientation = ExifInterface.ORIENTATION_ROTATE_180;
-			break;
-		case 270:
-			exifOrientation = ExifInterface.ORIENTATION_ROTATE_270;
-			break;
-		}
-
-		EI.setAttribute(ExifInterface.TAG_ORIENTATION, ""+exifOrientation);
-		try {
-			EI.saveAttributes();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
-	}
-
-	/**
 	 * Share a picture with a sharing intent
 	 * @param ctx The context required to start the intent
 	 * @param subject The subject of the message to send
@@ -1274,6 +750,7 @@ public class Tools {
 	 * @return true if we could launch the intent
 	 */
 	public static boolean sharePicture(Context ctx, String subject, String body, String fileName, String prompt){
+
 		// if any values are null, then return false
 		if (ctx == null || subject == null || body == null || prompt == null || fileName == null || fileName.length() == 0)
 			return false;
@@ -1305,97 +782,37 @@ public class Tools {
 		return true;
 	}
 
-	/**
-	 * Try to create the thumbnail from the full picture reading any exif data.
-	 * @param fullFile the path to the full file
-	 * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
-	 * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
-	 * @param imageQuality 0-100 quality setting (90 is usually a good comprimize of size and quality)
-	 * @return the bitmap, or null if any errors occured
-	 */
-	public static Bitmap getThumbnail(
-			String fullFile,
-			int maxPixelSize,
-			boolean forceBase2,
-			int imageQuality){
 
-		// open the full file
-		if (fullFile == null || fullFile.length() == 0)
-			return null;
-		RandomAccessFile f = null;
-		try{
-			f = new RandomAccessFile(fullFile, "r");
-		}catch (FileNotFoundException  e){
-			return null;
-		}
-
-		// read the file data
-		byte[] b = null;
-		ExifInterface exif = null;
-		try{
-			b = new byte[(int)f.length()];
-			f.read(b);
-			f.close();
-
-			// read the orientaion
-			exif = new ExifInterface(fullFile);
-		}catch(IOException e){
-			e.printStackTrace();
-			return null;
-		}
-
-		// grab the rotation
-		int rotation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 
-				ExifInterface.ORIENTATION_UNDEFINED);
-
-		// create the byte array
-		byte[] thumbnail = com.tools.Tools.makeThumbnail(
-				b,
-				rotation,
-				maxPixelSize,
-				forceBase2,
-				imageQuality);
-
-		if (thumbnail == null)
-			return null;
-
-		// convert to bitmap
-		return BitmapFactory.decodeByteArray(thumbnail, 0, thumbnail.length);
-	}
 
 	/**
 	 * Read a file into a byte[]. Output will be null if file cannot be read <br>
-	 * *** no header data is read for an image file, so com.tools.image.ImageLoader.readFullFile ***
+	 * *** no header data is read for an image file
+	 * @See ImageProcessing.readFullFile ***
 	 * @param fileName the file to read
-	 * @return the byte[] of the file
+	 * @return the byte[] of the file or null if couldn't be read
+	 * @throws IOException 
 	 */
-	public static byte[] readFile(String fileName){
-		// open the full file
+	public static byte[] readFile(String fileName) throws IOException{
+
+		// open the file for reading
 		if (fileName == null || fileName.length() == 0)
 			return null;
-		RandomAccessFile f = null;
-		try{
-			f = new RandomAccessFile(fileName, "r");
-		}catch (FileNotFoundException  e){
-			return null;
-		}
+		RandomAccessFile f = new RandomAccessFile(fileName, "r");
 
 		// read the file data
 		byte[] b = null;
 		try{
 			b = new byte[(int)f.length()];
 			f.read(b);
+		}finally{
 			f.close();
-		}catch(IOException e){
-			Log.e("com.tools.Tools", Log.getStackTraceString(e));
-			return null;
 		}
 
 		return b;
 	}
 
 	/**
-	 * Save the view and all its children to a bitmap <br>
+	 * Save the view and all its children to a bitmap. if View is null, null is returned <br>
 	 * @param view the view to save
 	 * @param viewsToHide a list of views to hide before creating the bitmap, null is acceptabl
 	 * @param viewToTakeFocus allow for the given view to take focus. Null is accetpable
@@ -1407,8 +824,9 @@ public class Tools {
 	 */
 	public static Bitmap saveViewToBitmap(View view, ArrayList<View> viewsToHide, View viewToTakeFocus, Integer nullColor){
 
+		// null view
 		if (view == null){
-			Log.e("com.tools", "null view was input");
+			Log.e(LOG_TAG, "null view was input");
 			return null;
 		}
 
@@ -1454,7 +872,7 @@ public class Tools {
 
 		// extract center region of bitmap
 		if (nullColor != null)
-			bitmap = bitmapExtractCenter(bitmap, nullColor);
+			bitmap = ImageProcessing.bitmapExtractCenter(bitmap, nullColor);
 
 		// show the views that we previously hid
 		if (viewsToHide != null){
@@ -1481,97 +899,6 @@ public class Tools {
 	}
 
 	/**
-	 * Remove the edges of bitmap by extracting the center region that do not match the given nullColor
-	 * @param bitmap the source bitmap
-	 * @param nullColor the color that is considered void and we will chop. For example, for black simply enter <br>
-	 * Color.argb(0, 0, 0, 0); 
-	 * @return
-	 */
-	public static Bitmap bitmapExtractCenter(Bitmap bitmap, int nullColor){
-		if (bitmap == null)
-			return null;
-
-		// measure size
-		final int width = bitmap.getWidth();
-		final int height = bitmap.getHeight();
-
-		// grab pixel data
-		int[] pixels = new int[width*height];
-		bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
-
-		// which row will we start and end and cols as well
-		int rowStart = 0;
-		int rowEnd = height-1;
-		int colStart = 0;
-		int colEnd = width-1;
-
-		// find the top that we can crop
-		boolean outerBreak = false;
-		for (int i = 0; i <height; i++){
-			int ii = i*width;
-			for (int j = 0; j < width; j++){				
-				if (pixels[ii + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			rowStart++;
-		}
-
-		// find the bottom that we can crop
-		outerBreak = false;
-		for (int i = height-1; i >= 0; i--){
-			int ii = i*width;
-			for (int j = 0; j < width; j++){
-				if (pixels[ii + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			rowEnd--;
-		}
-
-		// find the left we can crop
-		outerBreak = false;
-		for (int j = 0; j < width; j++){
-			for (int i = 0; i <height; i++){	
-				if (pixels[i*width + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			colStart++;
-		}
-
-		// find the right that we can crop
-		outerBreak = false;
-		for (int j = width-1; j >= 0; j--){
-			for (int i = 0; i <height; i++){	
-				if (pixels[i*width + j] != nullColor){
-					outerBreak = true;
-					break;				
-				}
-			}
-			if (outerBreak)
-				break;
-			colEnd--;
-		}
-
-		// sub index of matrix
-		int newWidth = colEnd-colStart+1;
-		int newHeight = rowEnd-rowStart+1;
-		if (newWidth <= 0 || newHeight <= 0)
-			return null;
-		return Bitmap.createBitmap(bitmap, colStart, rowStart, newWidth, newHeight);	
-	}
-
-	/**
 	 * Checks if a bitmap with the specified size fits in memory
 	 * @param bmpwidth Bitmap width
 	 * @param bmpheight Bitmap height
@@ -1581,7 +908,6 @@ public class Tools {
 	public static boolean checkBitmapFitsInMemory(long bmpwidth,long bmpheight, int bmpdensity ){
 		long reqsize=bmpwidth*bmpheight*bmpdensity;
 		long allocNativeHeap = Debug.getNativeHeapAllocatedSize();
-
 
 		final long heapPad=(long) Math.max(4*1024*1024,Runtime.getRuntime().maxMemory()*0.1);
 		if ((reqsize + allocNativeHeap + heapPad) >= Runtime.getRuntime().maxMemory())
@@ -1604,7 +930,7 @@ public class Tools {
 		Matcher matcher;
 
 		final String EMAIL_PATTERN = 
-			"^[_A-Za-z0-9-]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
+				"^[_A-Za-z0-9-]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
 
 		pattern = Pattern.compile(EMAIL_PATTERN);
 
@@ -1612,13 +938,13 @@ public class Tools {
 		matcher = pattern.matcher(email);
 		return matcher.matches();
 	}
-	
+
 	/**
-	 * Write the response from the server as an input stream to a file. The required folders will be written if not present.
+	 * Write an input stream to a file. The required folders will be written if not present.
 	 * @param inputStream The input stream to read from
 	 * @param filePath The path to write to
 	 * @param dataLength the total length of the data to read, <0 if unknown
-	 * @param progressBar a weakReference to a progress bar, null if none
+	 * @param progressBar A progress bar to update as will write the file, null if none. Will be kept as a weak reference, so it won't cause a leak
 	 * @return the number of bytes written to file
 	 * @throws IOException
 	 */
@@ -1627,8 +953,8 @@ public class Tools {
 			String filePath,
 			final long dataLength,
 			ProgressBar progressBar)
-			throws IOException{
-		
+					throws IOException{
+
 		// store weakReference
 		WeakReference<ProgressBar> weakProgress = new WeakReference<ProgressBar>(progressBar);
 		progressBar = null;
@@ -1636,7 +962,7 @@ public class Tools {
 		// if there was a bad input file
 		if (filePath == null)
 			throw(new FileNotFoundException());
-		
+
 		// write the required directories to the file
 		com.tools.Tools.writeRequiredFolders(filePath);
 
@@ -1657,24 +983,24 @@ public class Tools {
 			while ((count = inputStream.read(data)) != -1) {
 				output.write(data, 0, count);
 				total += count;
-				
+
 				// show the progress bar
 				final ProgressBar prog = weakProgress.get();
 				if (prog != null && dataLength > 0){
 					Activity act = (Activity)prog.getContext();
 					final long total2 = total;
 					act.runOnUiThread(new Runnable() {
-						
+
 						@Override
 						public void run() {
 							prog.setVisibility(View.VISIBLE);
 							prog.setProgress((int) (100 * total2 / dataLength));
-							
+
 						}
 					});
 				}
 			}
-			
+
 		}finally{
 
 			try{
@@ -1682,7 +1008,7 @@ public class Tools {
 				if (prog != null && dataLength > 0){
 					Activity act = (Activity)prog.getContext();
 					act.runOnUiThread(new Runnable() {
-						
+
 						@Override
 						public void run() {
 							prog.setVisibility(View.INVISIBLE);								
@@ -1692,7 +1018,7 @@ public class Tools {
 			}catch(Exception e){
 				Log.e(LOG_TAG, Log.getStackTraceString(e));
 			}
-			
+
 			// perform cleanup
 			if (output != null){
 				try{ 
@@ -1715,10 +1041,10 @@ public class Tools {
 				Log.e(LOG_TAG, Log.getStackTraceString(e));
 			}
 		}
-		
+
 		return total;
 	}
-	
+
 	/**
 	 * Write all the folders required to write the given file or folder path. <br>
 	 * ie. filePath = "/sdcard/appName/picture.jpg". This will make sure that the folder at /sdcard/appName exists
@@ -1726,23 +1052,118 @@ public class Tools {
 	 * @throws IOException Throws an exception if we couldn't create the path
 	 */
 	public static void writeRequiredFolders(String filePath)
-	throws IOException{
-		
+			throws IOException{
+
 		// no file
 		if (filePath == null || filePath.length() == 0)
 			return;
-		
+
 		// grab the parent folder
 		File file = new File(filePath);
 		File parent = file.getParentFile();
-		
+
 		// no parent
 		if (parent == null)
 			return;
-		
+
 		// check for existence and make if not exist
 		if (!parent.exists())
 			if(!parent.mkdirs())
 				throw new IOException("Cannot create folder " + parent.getAbsolutePath());
+	}
+
+	
+	
+	/**
+	 * Try to create the thumbnail from the full picture reading any exif data.
+	 * @param fullFile the path to the full file
+	 * @param maxPixelSize the maximum sixe in pixels for any dimension of the thumbnail. 
+	 * @param forceBase2 forcing the downsizing to be powers of 2 (ie 2,4,8). Faster, but obviously less specific size is allowable.
+	 * @return the bitmap, or null if any errors occured
+	 */
+	public static Bitmap getThumbnail(
+			String fullFile,
+			int maxPixelSize,
+			boolean forceBase2){
+
+		// open the full file
+		if (fullFile == null || fullFile.length() == 0)
+			return null;
+		RandomAccessFile f = null;
+		try{
+			f = new RandomAccessFile(fullFile, "r");
+		}catch (FileNotFoundException  e){
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
+			return null;
+		}
+
+		// read the file data
+		byte[] b = null;
+		ExifInterface exif = null;
+		try{
+			b = new byte[(int)f.length()];
+			f.read(b);
+
+			// read the orientaion
+			exif = new ExifInterface(fullFile);
+		}catch(IOException e){
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
+			return null;
+		}finally{
+			try {
+				f.close();
+			} catch (IOException e) {
+				Log.e(LOG_TAG, Log.getStackTraceString(e));
+				return null;
+			}
+		}
+
+		// grab the rotation
+		int rotation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 
+				ExifInterface.ORIENTATION_UNDEFINED);
+
+		// create the byte array
+		return ImageProcessing.makeThumbnail(
+				b,
+				rotation,
+				maxPixelSize,
+				forceBase2);
+	}
+
+	/**
+	 * Read a picture from the given path, return null if unsuffessful <br>
+	 * Make sure to NOT call on main UI thread because it's slow <br>
+	 * Will be properly rotated based on exif data stored in image. <br>
+	 * Performs no resizeing, so if this picture is not already small, you may get a memory crash
+	 * @param path The path where the picture is stored
+	 * @return the bitmap The bitmap data
+	 */
+	public static Bitmap getThumbnail(String path){
+		try{
+			// open the path if it exists
+			if (path != null && path.length() != 0 && (new File(path)).exists()){
+
+				// read the bitmap
+				Bitmap bmp = BitmapFactory.decodeFile(path);
+				if (bmp == null)
+					return bmp;
+
+				// now do the rotation
+				float angle =  ImageProcessing.getExifOrientationAngle(path);
+				if (angle != 0) {
+					Matrix matrix = new Matrix();
+					matrix.postRotate(angle);
+
+					bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+							bmp.getHeight(), matrix, true);
+				}
+				return bmp;
+			}
+			else	
+				return null;
+		}catch(IOException e){
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
+			return null;
+		}
 	}
 }

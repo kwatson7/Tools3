@@ -384,7 +384,7 @@ public class CameraHelper{
 		
 		// determine how best to fit camera preview into surface
 		params.setPreviewSize(bestWidthHeightPreivew.width, bestWidthHeightPreivew.height);
-		WidthHeight fitWindowWidthHeight = Tools.fitNoCrop(bestWidthHeightPreivew, windowSize);
+		WidthHeight fitWindowWidthHeight = ImageProcessing.fitNoCrop(bestWidthHeightPreivew, windowSize);
 		if (switchOrientation)
 			fitWindowWidthHeight = fitWindowWidthHeight.switchDimensions();
 
@@ -473,7 +473,7 @@ public class CameraHelper{
 			throw new Exception("Could not find a camera preview size.");
 		
 		// determine how best to fit camera preview into surface
-		WidthHeight fitWindowWidthHeight = Tools.fitNoCrop(bestWidthHeightPreivew, windowSize);
+		WidthHeight fitWindowWidthHeight = ImageProcessing.fitNoCrop(bestWidthHeightPreivew, windowSize);
 		if (switchOrientation)
 			fitWindowWidthHeight = fitWindowWidthHeight.switchDimensions();
 

@@ -15,6 +15,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.tools.ImageProcessing;
 import com.tools.SuccessReason;
 
 import android.app.Activity;
@@ -31,7 +32,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	// private variables
 	private MemoryCache<ID_TYPE> memoryCache = new MemoryCache<ID_TYPE>(); 	// This stores the bitmaps in memory
 	private Map<ImageView, ID_TYPE> imageViews =
-		Collections.synchronizedMap(new WeakHashMap<ImageView, ID_TYPE>()); // keeps track of links between views and pictures	
+			Collections.synchronizedMap(new WeakHashMap<ImageView, ID_TYPE>()); // keeps track of links between views and pictures	
 	private ExecutorService executorService;  								// run the threads
 	private final int stub_id;	 											// The resource id of the default image
 
@@ -46,6 +47,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	private static final int MAX_THREADS = 15; 								// max threads to spawn
 	private static final long REQUIRED_BYTES = 4000000; 					// we must have this many bytes or we will clear the cache
 	private static final long DOWNLOAD_TIMEOUT = 30000; 					// time in milliseconds to wait for image to download
+	private static final String LOG_TAG = "com.tools";
 
 	/**
 	 * Create an image loader that asynchonously loads images both from file and the webs. <br>
@@ -117,23 +119,22 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				ExifInterface.ORIENTATION_UNDEFINED);
 
 		// create the byte array
-		byte[] thumbnail = com.tools.Tools.makeThumbnail(
+		Bitmap thumbnail = ImageProcessing.makeThumbnail(
 				b,
 				rotation,
 				maxPixelSize,
-				forceBase2,
-				imageQuality);
+				forceBase2);
+		byte[] thumbByte = ImageProcessing.getByteArray(thumbnail, imageQuality);
 
 		// save the thumbnail
 		SuccessReason thumbnailSave = 
-			com.tools.Tools.saveByteDataToFile(
-					null,
-					thumbnail,
-					"",
-					false,
-					thumbPath,
-					ExifInterface.ORIENTATION_NORMAL,
-					false);
+				ImageProcessing.saveByteDataToFile(
+						null,
+						thumbByte,
+						false,
+						thumbPath,
+						ExifInterface.ORIENTATION_NORMAL,
+						false);
 
 		return thumbnailSave.getSuccess();
 	}
@@ -203,6 +204,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 			String path,
 			int desiredWidth,
 			int desiredHeight){
+
 		try{
 			if (path != null && path.length() != 0 && (new File(path)).exists()){
 
@@ -224,7 +226,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				BitmapFactory.Options options = new BitmapFactory.Options();
 				options.inSampleSize = intScale;
 				Bitmap bitmap = BitmapFactory.decodeStream(new FileInputStream(file), null, options);
-				float angle =  com.tools.Tools.getExifOrientationAngle(path);		
+				float angle =  ImageProcessing.getExifOrientationAngle(path);		
 
 				// now do the rotation
 				if (angle != 0) {
@@ -239,8 +241,11 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 			}else
 				return null;
 		}catch(FileNotFoundException e){
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
 			return null;
-		}catch(Exception e){
+
+		} catch (IOException e) {
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
 			return null;
 		}
 	}
@@ -286,27 +291,32 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	 * @return the bitmap
 	 */
 	public static Bitmap getThumbnail(String path){
-		// open the path if it exists
-		if (path != null && path.length() != 0 && (new File(path)).exists()){
+		try{
+			// open the path if it exists
+			if (path != null && path.length() != 0 && (new File(path)).exists()){
 
-			// read the bitmap
-			Bitmap bmp = BitmapFactory.decodeFile(path);
-			if (bmp == null)
+				// read the bitmap
+				Bitmap bmp = BitmapFactory.decodeFile(path);
+				if (bmp == null)
+					return bmp;
+
+				// now do the rotation
+				float angle =  ImageProcessing.getExifOrientationAngle(path);
+				if (angle != 0) {
+					Matrix matrix = new Matrix();
+					matrix.postRotate(angle);
+
+					bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+							bmp.getHeight(), matrix, true);
+				}
 				return bmp;
-
-			// now do the rotation
-			float angle =  com.tools.Tools.getExifOrientationAngle(path);
-			if (angle != 0) {
-				Matrix matrix = new Matrix();
-				matrix.postRotate(angle);
-
-				bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
-						bmp.getHeight(), matrix, true);
 			}
-			return bmp;
-		}
-		else	
+			else	
+				return null;
+		}catch(IOException e){
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
 			return null;
+		}
 	}	
 
 	/**
@@ -369,37 +379,37 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
 		// create the object containing all the relevant data
 		PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data =
-			new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
-					pictureRowId,
-					thumbnail,
-					fullPictuure,
-					imageView,
-					weakProgress.get());
+				new PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>(
+						pictureRowId,
+						thumbnail,
+						fullPictuure,
+						imageView,
+						weakProgress.get());
 
-			// store the links
-			imageViews.put(imageView, pictureRowId);
+				// store the links
+				imageViews.put(imageView, pictureRowId);
 
-			// attempt to access cached full picture
-			Bitmap bitmap = null;
-			if (showFullImage)
-				bitmap = memoryCache.getFullPicture(pictureRowId);
+				// attempt to access cached full picture
+				Bitmap bitmap = null;
+				if (showFullImage)
+					bitmap = memoryCache.getFullPicture(pictureRowId);
 
-			// no full picture, so queue the photo loader, and check for thumbnail
-			if (bitmap == null){
-				bitmap = memoryCache.getThumbnail(pictureRowId);
-				if (bitmap == null)
-					queuePhoto(data, true);
-				else if (showFullImage)
-					queuePhoto(data, false);
-			}
+				// no full picture, so queue the photo loader, and check for thumbnail
+				if (bitmap == null){
+					bitmap = memoryCache.getThumbnail(pictureRowId);
+					if (bitmap == null)
+						queuePhoto(data, true);
+					else if (showFullImage)
+						queuePhoto(data, false);
+				}
 
-			// see if we have a bitmap to access
-			if(bitmap!=null)
-				imageView.setImageBitmap(bitmap);
+				// see if we have a bitmap to access
+				if(bitmap!=null)
+					imageView.setImageBitmap(bitmap);
 
-			// otherwise just show the default image
-			else
-				imageView.setImageResource(stub_id);
+				// otherwise just show the default image
+				else
+					imageView.setImageResource(stub_id);
 	}
 
 	/**
@@ -572,61 +582,61 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 			// synchronize access to only allow for each picture single access to this block, so as not to allow mutliple grabs of the same file
 			//synchronized (thumbnailsLoadingLocks.get(photoToLoad.pictureId)) {
 
-				// should we grab the thumbnail first?
-				if (getThumbnailFirst){
-					Bitmap bmp = memoryCache.getThumbnail(photoToLoad.pictureId);
-					if (bmp == null)
-						bmp = loadImageCallback.onThumbnailLocal(photoToLoad.thumbnail);
-					if (bmp == null)
-						bmp = loadImageCallback.onThumbnailWeb(photoToLoad.thumbnail);
-					if (bmp == null)
-						loadImageCallback.createThumbnailFromFull(photoToLoad.thumbnail, photoToLoad.fullPicture);
-					if (bmp != null)
-						memoryCache.putThumbnail(photoToLoad.pictureId, bmp);
+			// should we grab the thumbnail first?
+			if (getThumbnailFirst){
+				Bitmap bmp = memoryCache.getThumbnail(photoToLoad.pictureId);
+				if (bmp == null)
+					bmp = loadImageCallback.onThumbnailLocal(photoToLoad.thumbnail);
+				if (bmp == null)
+					bmp = loadImageCallback.onThumbnailWeb(photoToLoad.thumbnail);
+				if (bmp == null)
+					loadImageCallback.createThumbnailFromFull(photoToLoad.thumbnail, photoToLoad.fullPicture);
+				if (bmp != null)
+					memoryCache.putThumbnail(photoToLoad.pictureId, bmp);
 
-					// recycled view
-					if(imageViewReused(photoToLoad))
-						return;
+				// recycled view
+				if(imageViewReused(photoToLoad))
+					return;
 
-					// load the bitmap on the ui thread
-					if (bmp != null){
-						BitmapDisplayer bd = new BitmapDisplayer(bmp, photoToLoad);
-						ImageView image = photoToLoad.imageViewSoftReference.get();
-						if (image != null){
-							Activity a=(Activity)image.getContext();
-							a.runOnUiThread(bd);
-						}
+				// load the bitmap on the ui thread
+				if (bmp != null){
+					BitmapDisplayer bd = new BitmapDisplayer(bmp, photoToLoad);
+					ImageView image = photoToLoad.imageViewSoftReference.get();
+					if (image != null){
+						Activity a=(Activity)image.getContext();
+						a.runOnUiThread(bd);
 					}
 				}
+			}
 			//}
 
 			//synchronized (fullSizeLoadingLocks.get(photoToLoad.pictureId)) {
 
-				// grab the full picture
-				if (showFullImage){
-					Bitmap fullBmp = memoryCache.getFullPicture(photoToLoad.pictureId);
-					clearCacheIfNeeded();
-					if (fullBmp == null)
-						fullBmp = loadImageCallback.onFullSizeLocal(photoToLoad.fullPicture, desiredWidth, desiredHeight);
-					if (fullBmp == null)
-						fullBmp = loadImageCallback.onFullSizeWeb(photoToLoad.fullPicture, desiredWidth, desiredHeight, photoToLoad.weakProgress);
-					if (fullBmp != null)
-						memoryCache.putFullPicture(photoToLoad.pictureId, fullBmp);
+			// grab the full picture
+			if (showFullImage){
+				Bitmap fullBmp = memoryCache.getFullPicture(photoToLoad.pictureId);
+				clearCacheIfNeeded();
+				if (fullBmp == null)
+					fullBmp = loadImageCallback.onFullSizeLocal(photoToLoad.fullPicture, desiredWidth, desiredHeight);
+				if (fullBmp == null)
+					fullBmp = loadImageCallback.onFullSizeWeb(photoToLoad.fullPicture, desiredWidth, desiredHeight, photoToLoad.weakProgress);
+				if (fullBmp != null)
+					memoryCache.putFullPicture(photoToLoad.pictureId, fullBmp);
 
-					// recycled view
-					if(imageViewReused(photoToLoad))
-						return;
+				// recycled view
+				if(imageViewReused(photoToLoad))
+					return;
 
-					// load the bitmap on the ui thread
-					if (fullBmp != null){
-						BitmapDisplayer bd = new BitmapDisplayer(fullBmp, photoToLoad);
-						ImageView image = photoToLoad.imageViewSoftReference.get();
-						if (image != null){
-							Activity a=(Activity)image.getContext();
-							a.runOnUiThread(bd);
-						}
+				// load the bitmap on the ui thread
+				if (fullBmp != null){
+					BitmapDisplayer bd = new BitmapDisplayer(fullBmp, photoToLoad);
+					ImageView image = photoToLoad.imageViewSoftReference.get();
+					if (image != null){
+						Activity a=(Activity)image.getContext();
+						a.runOnUiThread(bd);
 					}
 				}
+			}
 			//}
 		}
 	}

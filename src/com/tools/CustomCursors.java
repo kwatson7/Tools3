@@ -468,7 +468,7 @@ public class CustomCursors {
 
 		Cursor cursor = act.getContentResolver().query(CommonDataKinds.Phone.CONTENT_URI, projection,
 				selection, null, null);	
-		if (cursor == null || cursor.moveToFirst()){
+		if (cursor != null && cursor.moveToFirst()){
 			out = cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.RAW_CONTACT_ID));
 		}else
 			out = "";

@@ -108,6 +108,8 @@ extends TextView{
 			}
 			canvas.clipRect(0, 0, getWidth(), getHeight(), android.graphics.Region.Op.REPLACE);
 			break;
+		case ROTATION_NORMAL:
+			break;
 		}
 		super.draw(canvas);
 	}

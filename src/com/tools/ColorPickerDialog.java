@@ -296,6 +296,7 @@ extends Dialog {
                         invalidate();
                         break;
                     }
+                    break;
                 case MotionEvent.ACTION_MOVE:
                     if (mTrackingCenter) {
                         if (mHighlightCenter != inCenter) {
