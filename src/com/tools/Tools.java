@@ -49,6 +49,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 
 /**
  * @author Kyle Watson
@@ -72,7 +73,7 @@ public class Tools {
 	public static final String NUM_MESSAGES = "NUM_MESSAGES";
 	/** The preferred buffer size for writing input streams to file */
 	public static final int BUFFER_SIZE = 1024;
-	
+
 	private static final String LOG_TAG = "Tools";
 
 	/**
@@ -1072,9 +1073,9 @@ public class Tools {
 				throw new IOException("Cannot create folder " + parent.getAbsolutePath());
 	}
 
-	
-	
-	
+
+
+
 
 	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
@@ -1111,5 +1112,64 @@ public class Tools {
 			Log.e(LOG_TAG, Log.getStackTraceString(e));
 			return null;
 		}
+	}
+
+	/**
+	 * Show an alert window if we can (the activity is not finishing and not null), <br>
+	 * else launch a new window using applicationContext, else show a toast
+	 * @param act The activity that will launch the dialog
+	 * @param ctx The context to launch a new activity window
+	 * @param message The message to show
+	 * @return the dialog if it was used or null
+	 */
+	public static AlertDialog showAlert(Activity act, Context applicationContext, String message){
+
+		// force the application context
+		Context ctx = null;
+		if (applicationContext != null)
+			ctx = applicationContext.getApplicationContext();
+		if (ctx == null && act != null)
+			ctx = act.getApplicationContext();
+		
+		AlertDialog dialog = null;
+
+		try{
+			// first the dialog if we can
+			if (act != null && !act.isFinishing()){
+				AlertDialog.Builder dlgAlert  = new AlertDialog.Builder(act);
+
+				dlgAlert.setMessage(message);
+				dlgAlert.setCancelable(true);
+				dlgAlert.setPositiveButton("OK",
+						new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int which) {
+						//dismiss the dialog  
+					}
+				});
+				dialog = dlgAlert.create();
+				dialog.show();
+			}else{
+
+				// the new window if we must
+				Intent intent = new Intent(ctx, com.tools.MessageDialog.class);
+				intent.putExtra(com.tools.MessageDialog.TITLE_BUNDLE, "Message");
+				intent.putExtra(com.tools.MessageDialog.DEFAULT_TEXT, message);
+				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				ctx.startActivity(intent);
+			}
+		}catch(Exception e){
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
+
+			// failsafe toast
+			if (ctx != null){
+				try{
+					Toast.makeText(ctx, message, Toast.LENGTH_LONG);
+				}catch(Exception e2){
+					Log.e(LOG_TAG, Log.getStackTraceString(e2));
+				}
+			}
+		}
+		
+		return dialog;
 	}
 }
