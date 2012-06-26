@@ -31,7 +31,8 @@ public class CameraHelper{
 	private OnRotationCallback callback; 											// Call this when the phone orientation changes
 	private boolean isPreviewRunning = false;										// keep track if the preview is currently running.
 	private boolean isPreviewStarting = false; 										// keep track if we are currently in the process of starting preview
-
+	private String flashMode = Camera.Parameters.FLASH_MODE_AUTO;
+	
 	// orientation enum
 	public enum Orientation{
 		ORIENTATION_PORTRAIT_NORMAL(90),ORIENTATION_LANDSCAPE_NORMAL(0),
@@ -250,17 +251,37 @@ public class CameraHelper{
 		if (flashList == null || !flashList.contains(flashMode))
 			return false;
 		params.setFlashMode(flashMode);
+		mCamera.setParameters(params);
 		return true;
+	}
+	
+	/**
+	 * Get the current flashmode. Can be null if no camera is set.
+	 * @return
+	 */
+	public String getFlashMode(){
+		Parameters params = getParameters();
+		if (params == null)
+			return null;
+		
+		return params.getFlashMode();
 	}
 
 	/** call this in the calling activity, when camera is updated. <br>
 	 * MUST be done <br>
 	 * Also stops any currently running previews on old camera and assumes new camera does not have a preview running
+	 * Will set the flash mode to whatever it was last, or auto if there was no last
 	 * */
 	public void updateCam(Camera newCam){
 		// stop any running previews
 		stopPreview();
 
+		String oldFlashMode = getFlashMode();
+		if (oldFlashMode != null)
+			flashMode = oldFlashMode;
+		if (flashMode == null)
+			flashMode = Camera.Parameters.FLASH_MODE_AUTO;
+		
 		// set new camera
 		mCamera = newCam;	
 
@@ -269,6 +290,7 @@ public class CameraHelper{
 			Parameters params = mCamera.getParameters();
 			params.setJpegQuality(jpegQuality);
 			mCamera.setParameters(params);
+			setFlash(flashMode);
 		}
 	}
 
@@ -375,7 +397,6 @@ public class CameraHelper{
 	/**
 	 * Set the surfaceView size to be within the set limits and scaled correctly. Also set the camera and preivew size.
 	 * @param act An activity required to set some various parameters
-	 * @param flashMode The flash mode desired. See getSupportedFlashModes for options. Camera.Parameters.FLASH_MODE_AUTO is a good option.
 	 * @param optimalWidthHeight The desired WidthHeight to make the final picture. Null if the maximum of camera is desired.
 	 * @param maxWidthHeight The max WidthHeight to make the camera size. Null if maximum is desired
 	 * @param windowSize The max WidthHeight to fit the preview in. Null if the full screen is desired.
@@ -385,7 +406,6 @@ public class CameraHelper{
 	 */
 	public void setSurfaceSizePreviewSizeCameraSize(
 			Activity act,
-			String flashMode,
 			WidthHeight optimalWidthHeight,
 			WidthHeight maxWidthHeight,
 			WidthHeight windowSize,
@@ -409,9 +429,6 @@ public class CameraHelper{
 		else if (orientation == 1)
 			rotation = 0;
 		mCamera.setDisplayOrientation(rotation);
-
-		// set the flash mode
-		params.setFlashMode(flashMode);	
 
 		// get possible preview sizes and image sizes
 		List <Size> sizes = params.getSupportedPictureSizes();
