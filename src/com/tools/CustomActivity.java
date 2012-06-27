@@ -19,7 +19,7 @@ extends Activity{
 	/**
 	 * The context of this activity
 	 */
-	protected Context ctx = this;
+	protected final Context ctx = this;
 	
 	/** The instance of the configuration properties */
 	protected ConfigurationProperties configurationProperties = null;
@@ -114,7 +114,7 @@ extends Activity{
 	 * Create a class that is passed out on onRetainNonConfigurationInstance
 	 *
 	 */
-	protected  class ConfigurationProperties{
+	protected static class ConfigurationProperties{
 		protected ArrayList<CustomAsyncTask> asyncArrayConfig;
 		public Object customData;
 	}
