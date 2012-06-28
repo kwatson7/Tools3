@@ -57,7 +57,6 @@ import android.widget.Toast;
  */
 public class Tools {
 
-	//TODO: class not commented
 	// static variables for use in methods
 	/** SMS field to be inserted as a received message */
 	public static final int MESSAGE_TYPE_INBOX = 1; 
@@ -497,7 +496,7 @@ public class Tools {
 	 * The allowable outputs are years (365 days), weeks, days, hours, minutes, seconds
 	 * <p></p>
 	 * @param minutes
-	 * @return
+	 * @return the human readable string
 	 */
 	public static String convertMinutesToFormattedString(double minutes){
 
@@ -783,12 +782,9 @@ public class Tools {
 		// return true
 		return true;
 	}
-
-
-
+	
 	/**
 	 * Read a file into a byte[]. Output will be null if file cannot be read <br>
-	 * *** no header data is read for an image file
 	 * @See ImageProcessing.readFullFile ***
 	 * @param fileName the file to read
 	 * @return the byte[] of the file or null if couldn't be read
@@ -807,7 +803,11 @@ public class Tools {
 			b = new byte[(int)f.length()];
 			f.read(b);
 		}finally{
-			f.close();
+			try{
+				f.close();
+			}catch(Exception e){
+				Log.e(LOG_TAG, Log.getStackTraceString(e));
+			}
 		}
 
 		return b;
@@ -1076,7 +1076,7 @@ public class Tools {
 
 
 
-
+//TODO: the below class need to be commented and/or verified
 
 	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
