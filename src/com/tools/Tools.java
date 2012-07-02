@@ -8,8 +8,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.ref.WeakReference;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.security.SecureRandom;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Debug;
+import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
@@ -286,10 +289,8 @@ public class Tools {
 		// see if we need to break up the message
 		int nMessages = 1;
 		ArrayList<String> parts = null;
-		if (message.length() > 160){
-			parts = sms.divideMessage(message);
-			nMessages = parts.size();
-		}
+		parts = sms.divideMessage(message);
+		nMessages = parts.size();
 
 		// create intent for sending
 		Intent intentSent = new Intent(SENT);
@@ -299,19 +300,15 @@ public class Tools {
 				intentSent, PendingIntent.FLAG_UPDATE_CURRENT);
 
 		// create intent for delivering
-		Intent intentDelivered = new Intent(SENT);
+		Intent intentDelivered = new Intent(DELIVERED);
 		intentDelivered.putExtra(OPTION, option);
 		intentDelivered.putExtra(NUM_MESSAGES, nMessages);
 		PendingIntent deliveredPI = PendingIntent.getBroadcast(ctx, 0,
 				intentDelivered, PendingIntent.FLAG_UPDATE_CURRENT);   
 
 		// send the messages
-		if (nMessages > 1){
-			for (int i = 0; i < parts.size(); i++)
-				sms.sendTextMessage(phoneNumber, null, parts.get(i), sentPI, deliveredPI);
-		}else{
-			sms.sendTextMessage(phoneNumber, null, message, sentPI, deliveredPI);
-		}
+		for (int i = 0; i < parts.size(); i++)
+			sms.sendTextMessage(phoneNumber, null, parts.get(i), sentPI, deliveredPI);
 
 		// save text into database
 		insertSMSDatabse(ctx, phoneNumber, message, MESSAGE_TYPE_SENT);
@@ -495,57 +492,94 @@ public class Tools {
 	 * <p></p>
 	 * The allowable outputs are years (365 days), weeks, days, hours, minutes, seconds
 	 * <p></p>
-	 * @param minutes
+	 * @param minutes the minutes to convert
+	 * @param maxDecimals The maximum number of decimals to show in seconds. (-1 shows the max)
+	 * @param maxCategories The maximum number of categories to show (-1 shows max). For example, if
+	 * maxCategories = 2, then we would show 2 days, 6 hours (and then chop off all remaining times)
 	 * @return the human readable string
 	 */
-	public static String convertMinutesToFormattedString(double minutes){
+	public static String convertMinutesToFormattedString(double minutes, int maxDecimals, int maxCategories){
 
 		// the output string
 		String output = "";
+		
+		// keep track of how many categories we have shown
+		int categoriesShown = 0;
+		if (maxCategories == -1)
+			maxCategories = 1000;
 
 		// find how many years
 		int years = (int) Math.floor(minutes/(365*60*24));
-		if (years > 0){
-			output = years + " years, ";
+		if (years > 0 && categoriesShown < maxCategories){
+			categoriesShown++;
+			if (years == 1)
+				output = years + " year, ";
+			else
+				output = years + " years, ";
 			minutes = minutes - (years*365*60*24);
 		}
 
 		// how many weeks
 		int weeks = (int) Math.floor(minutes/(60*24*7));
-		if (weeks > 0){
-			output += weeks + " weeks, ";
+		if (weeks > 0 && categoriesShown < maxCategories){
+			categoriesShown++;
+			if (weeks == 1)
+				output += weeks + " week, ";
+			else
+				output += weeks + " weeks, ";
 			minutes = minutes - (weeks*60*24*7);
 		}
 
 		// how many days
 		int days = (int) Math.floor(minutes/(60*24));
-		if (days > 0){
-			output += days + " days, ";
+		if (days > 0 && categoriesShown < maxCategories){
+			categoriesShown++;
+			if (days == 1)
+				output += days + " day, ";
+			else
+				output += days + " days, ";
 			minutes = minutes - (days*60*24);
 		}
 
 		// how many hours
 		int hours = (int) Math.floor(minutes/(60));
-		if (hours > 0){
-			output += hours + " hours, ";
+		if (hours > 0 && categoriesShown < maxCategories){
+			categoriesShown++;
+			if (hours == 1)
+				output += hours + " hour, ";
+			else
+				output += hours + " hours, ";
 			minutes = minutes - (hours*60);
 		}
 
 		// how many minutes
 		int minutesDisp = (int) Math.floor(minutes);
-		if (minutesDisp > 0){
-			output += minutesDisp + " minutes, ";
+		if (minutesDisp > 0 && categoriesShown < maxCategories){
+			categoriesShown++;
+			if (minutesDisp == 1)
+				output += minutesDisp + " minute, ";
+			else
+				output += minutesDisp + " minutes, ";
 			minutes = minutes - (minutesDisp);
 		}
 
 		// how many seconds
 		float seconds =  (float) (minutes*60.0);
-		if (seconds > 0){
-			output += seconds + " seconds, ";
+		if (maxDecimals != -1)
+			seconds = (float) com.tools.MathTools.round(seconds, maxDecimals);
+		if (seconds > 0 && categoriesShown < maxCategories){
+			categoriesShown++;
+			if (seconds == 1)
+				output += new BigDecimal(seconds).stripTrailingZeros().toPlainString() + " second, ";
+			else
+				output += new BigDecimal(seconds).stripTrailingZeros().toPlainString()  + " seconds, ";
 		}
 
 		// return the string minus the last comma and space
-		return output.substring(0, output.length()-2);		
+		if (output.length() >= 2)
+			return output.substring(0, output.length()-2);		
+		else
+			return output;
 	}
 
 	/**
@@ -782,6 +816,47 @@ public class Tools {
 		// return true
 		return true;
 	}
+	
+	/**
+	 * Determine if the external storage is currently mounted
+	 * @param requireWriteAccess true to require write access and false to only require read access
+	 * @return True if mounted, false otherwise
+	 */
+	static public boolean isStorageAvailable(boolean requireWriteAccess) {
+
+	    String state = Environment.getExternalStorageState();
+
+	    if (Environment.MEDIA_MOUNTED.equals(state)) {
+	        if (requireWriteAccess) {
+	            boolean writable = checkFsWritable();
+	            return writable;
+	        } else {
+	            return true;
+	        }
+	    } else if (!requireWriteAccess && Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+	        return true;
+	    }
+	    return false;
+	}
+	
+	/**
+	 * Check if the file system is writable.
+	 *  Create a temporary file to see whether a volume is really writeable.
+	 *  It's important not to put it in the root directory which may have a
+	 *  limit on the number of files. No file is actually written
+	 * @return true if we can write to the external file system, and false otherwise
+	 */
+	private static boolean checkFsWritable() {
+        
+        String directoryName = Environment.getExternalStorageDirectory().toString() + "/DCIM";
+        File directory = new File(directoryName);
+        if (!directory.isDirectory()) {
+            if (!directory.mkdirs()) {
+                return false;
+            }
+        }
+        return directory.canWrite();
+    }
 	
 	/**
 	 * Read a file into a byte[]. Output will be null if file cannot be read <br>

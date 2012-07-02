@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
+import android.annotation.TargetApi;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.pm.PackageInfo;
@@ -570,6 +571,7 @@ public class ImageProcessing {
 	 * @param exifOrientation the orientation to store in exif header. See ExifInterface for details. Input null to not save anything.
 	 * @param showImageInScanner boolean to show the image in the media scanner. Usually true
 	 * */
+	@TargetApi(8)
 	public static SuccessReason saveByteDataToFile(
 			Context ctx, 
 			byte[] data, 

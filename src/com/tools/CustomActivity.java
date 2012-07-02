@@ -103,7 +103,7 @@ extends Activity{
 	 * @param asyncTypeCall 	Enum type, showing where in async this call took place
 	 * @param data 				Any data that needs to be passed in to the calling activity
 	 */
-	public abstract void onAsyncExecute(int requestCode, AsyncTypeCall asyncTypeCall, Object data);
+	public void onAsyncExecute(int requestCode, AsyncTypeCall asyncTypeCall, Object data){}
 	
 	/**
 	 * Should call within onCreateOverride or anywhere else the layout needs to be initialized.

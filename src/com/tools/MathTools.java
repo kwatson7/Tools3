@@ -107,6 +107,19 @@ public class MathTools {
 		return product;
 
 	}
+	
+	/**
+	 * Round The given number to the specified number of decimals
+	 * @param valueToRound The value to round
+	 * @param numberOfDecimalPlaces how many decimals we want
+	 * @return The new rounded number
+	 */
+	public static double round(double valueToRound, int numberOfDecimalPlaces){
+		
+	    double multipicationFactor = Math.pow(10, numberOfDecimalPlaces);
+	    double interestedInZeroDPs = valueToRound * multipicationFactor;
+	    return Math.round(interestedInZeroDPs) / multipicationFactor;
+	}
 
 	/** Check if number is even, simple
 	 * 
