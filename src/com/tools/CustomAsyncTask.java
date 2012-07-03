@@ -44,7 +44,7 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 	
 	/**
 	 * Constructor. This task will be added to teh calling activities list of tasks to manage.
-	 * @param act the calling activity
+	 * @param act the calling activity. Can be null, but loss of functionality
 	 * @param requestId A custom id to identify the asynctask to the calling activity
 	 * @param isAttachToApplication boolean to keep activity attached to application, not just activity
 	 * @param isCancelOnActivityDestroy should the calling activity cancel this task when it is destroyed? Also, inside
