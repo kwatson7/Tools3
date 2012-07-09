@@ -589,7 +589,7 @@ public class CameraHelper{
 	 * Start the camera preview. If it is currently running, then it will stop it and restart.
 	 * If mCamera == null, then nothing will happen. This happens on a background thread.
 	 */
-	public  void startPreview(){
+	public synchronized void startPreview(){
 		//TODO: this used to be a synchronized method, see if iw need it
 		if (isPreviewStarting)
 			return;
@@ -614,7 +614,7 @@ public class CameraHelper{
 	/**
 	 * Stop the camera preview. If null camera or already stopped, nothing happens.
 	 */
-	public void stopPreview(){
+	public synchronized void stopPreview(){
 		if (mCamera == null){
 			isPreviewRunning = false;
 			return;
@@ -631,7 +631,7 @@ public class CameraHelper{
 	 * want to keep track of this. For example, if you called TakePicture.
 	 * @param running
 	 */
-	public void setIsPreviewRunning(boolean running){
+	public synchronized void setIsPreviewRunning(boolean running){
 		isPreviewRunning = running;
 	}
 

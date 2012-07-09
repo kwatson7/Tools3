@@ -368,7 +368,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	 * @param mem
 	 */
 	public void restoreMemoryCache(MemoryCache<ID_TYPE> mem){
-		if (memoryCache != null)
+		if (memoryCache != null && mem != memoryCache)
 			memoryCache.clear();
 		memoryCache = mem;
 	}

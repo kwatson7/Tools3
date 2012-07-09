@@ -1,4 +1,4 @@
-package android.util;
+package test.android.util;
 /*
  * Copyright (C) 2010 The Android Open Source Project
  *
@@ -18,6 +18,8 @@ package android.util;
 
 
 import java.io.UnsupportedEncodingException;
+
+import android.util.Base64OutputStream;
 
 /**
  * Utilities for encoding and decoding the Base64 representation of

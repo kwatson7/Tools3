@@ -267,11 +267,20 @@ implements CustomList<TYPE>{
 	
 	/**
 	 * Allow this activity to start managing this cursor to close and open properly with lifecycle.
-	 * @param act
+	 * @param act The activity to manage the cursor
 	 */
 	public final void startManagingCursor(Activity act){
 		if (isCursorValid())
 			act.startManagingCursor(cursor);
+	}
+	
+	/**
+	 * Allow this activity to start managing this cursor to close and open properly with lifecycle.
+	 * @param act the activity to stop managing
+	 */
+	public final void stopManagingCursor(Activity act){
+		if (isCursorValid())
+			act.stopManagingCursor(cursor);
 	}
 	
 	@Override

@@ -101,6 +101,7 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 		// the callback if we have one
 		if (finishedCallback != null){
 			finishedCallback.onFinish(callingActivity, result);
+			finishedCallback = null;
 		}
 		
 		// detach from calling context to free the link
