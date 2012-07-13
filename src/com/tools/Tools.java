@@ -763,6 +763,7 @@ public class Tools {
 		long when = System.currentTimeMillis();
 		Notification notification = new Notification(icon, tickerText, when);
 		notification.flags |= Notification.FLAG_AUTO_CANCEL;
+		notification.defaults =  Notification.DEFAULT_ALL;
 
 		//Define the notification's message and PendingIntent:
 		Context context = ctx.getApplicationContext();

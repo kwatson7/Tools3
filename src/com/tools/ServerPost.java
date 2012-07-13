@@ -591,7 +591,7 @@ public class ServerPost {
 		 * @return
 		 */
 		final public boolean isSuccess(){
-			return (errorCode == null || errorCode.length() == 0 && isSuccessCustom());
+			return ((errorCode == null || errorCode.length() == 0) && isSuccessCustom());
 		}
 
 		/**
