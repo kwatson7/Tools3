@@ -90,6 +90,10 @@ public class CameraHelper{
 		this.callback = callback;
 	}
 
+	/**
+	 * Set the rotation callback. This is called when the screen changes orientation
+	 * @param callback
+	 */
 	public void setRotationCallback(OnRotationCallback callback){
 		this.callback = callback;
 	}
@@ -97,7 +101,7 @@ public class CameraHelper{
 	/**
 	 * call this in the calling activity's onResume. MUST be done
 	 * 
-	 * */
+	 */
 	public void onResume(Context ctx) {
 
 		// prepare listener for orientation changes

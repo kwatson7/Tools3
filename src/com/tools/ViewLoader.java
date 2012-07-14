@@ -53,6 +53,23 @@ public class ViewLoader<ID_TYPE, LOOKUP_TYPE, VALUE_TYPE, VIEW_TYPE extends View
 		this.defaultValue = defaultValue;
 		this.loadDataCallback = callback;
 	}
+	
+	/**
+	 * Create a view loader that asynchonously loads data and assigns to views. <br>
+	 * See stopThreads and restartThreads
+	 * @param defaultValue The default value to use when there is no data yet available
+	 * @param maxThreads maximum threads to use. 15 is the default
+	 * @param callback Callback used to load the data and to bind to views
+	 */
+	public ViewLoader(
+			VALUE_TYPE defaultValue,
+			int maxThreads,
+			LoadData<LOOKUP_TYPE, VALUE_TYPE, VIEW_TYPE> callback){
+
+		executorService = Executors.newFixedThreadPool(maxThreads);
+		this.defaultValue = defaultValue;
+		this.loadDataCallback = callback;
+	}
 
 	/**
 	 * Clear the cache and reset didWeReceivedOomError

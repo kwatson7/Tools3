@@ -225,7 +225,26 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				// now actually do the resizeing
 				BitmapFactory.Options options = new BitmapFactory.Options();
 				options.inSampleSize = intScale;
-				Bitmap bitmap = BitmapFactory.decodeStream(new FileInputStream(file), null, options);
+				Bitmap bitmap = null;
+				try{
+					bitmap = BitmapFactory.decodeStream(new FileInputStream(file), null, options);
+				}catch(OutOfMemoryError e1){
+					Log.e("ImageLoader", "out of memory - garbage collecting first");
+					System.gc();
+					try{
+						bitmap = BitmapFactory.decodeStream(new FileInputStream(file), null, options);
+					}catch(OutOfMemoryError e2){
+						Log.e("ImageLoader", "out of memory - scale down to 2x smaller size");
+						options.inSampleSize = options.inSampleSize*2;
+						try{
+							bitmap = BitmapFactory.decodeStream(new FileInputStream(file), null, options);
+						}catch(OutOfMemoryError e3){
+							Log.e("ImageLoader", "out of memory -scale down to 4x smaller size");
+							options.inSampleSize = options.inSampleSize*2;
+							bitmap = BitmapFactory.decodeStream(new FileInputStream(file), null, options);
+						}
+					}
+				}
 				float angle =  ImageProcessing.getExifOrientationAngle(path);		
 
 				// now do the rotation

@@ -735,7 +735,7 @@ public class Tools {
 	}
 
 	/**
-	 * Post a notification to the notification bar
+	 * Post a notification to the notification bar and use default notification sound and lights.
 	 * @param act The calling activity
 	 * @param icon The id to the icon to use
 	 * @param tickerText The text that shows in the notification bar
@@ -763,7 +763,7 @@ public class Tools {
 		long when = System.currentTimeMillis();
 		Notification notification = new Notification(icon, tickerText, when);
 		notification.flags |= Notification.FLAG_AUTO_CANCEL;
-		notification.defaults =  Notification.DEFAULT_ALL;
+		notification.defaults =  Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND;
 
 		//Define the notification's message and PendingIntent:
 		Context context = ctx.getApplicationContext();
