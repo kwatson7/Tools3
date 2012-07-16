@@ -172,6 +172,9 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				BitmapFactory.Options options = new BitmapFactory.Options();
 				options.inSampleSize = intScale;
 				Bitmap bitmap = BitmapFactory.decodeByteArray(inputData, 0, inputData.length, options);	
+				
+				if(bitmap == null)
+					return null;
 
 				// now do the rotation
 				if (angle != 0) {
@@ -245,6 +248,9 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 						}
 					}
 				}
+				if(bitmap == null)
+					return null;
+				
 				float angle =  ImageProcessing.getExifOrientationAngle(path);		
 
 				// now do the rotation
