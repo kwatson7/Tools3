@@ -12,8 +12,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import com.tools.ImageProcessing;
 import com.tools.SuccessReason;
@@ -415,8 +417,22 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 	 */
 	private void queuePhoto(PhotoToLoad<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE> data, boolean getThumbnailFirst)
 	{
-		if (executorService != null)
+		if (executorService != null){
 			executorService.submit(new PhotosLoader(data, getThumbnailFirst, showFullImage));
+			/*
+			Future<?> future = executorService.submit(new PhotosLoader(data, getThumbnailFirst, showFullImage));
+			try {
+				future.get();
+			} catch (ExecutionException e) {
+				Throwable rootException = e.getCause();
+				int kyle = 6;
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				Throwable rootException2 = e.getCause();
+				int kyle2 = 6;
+			}
+			*/
+		}
 	}
 
 	/**

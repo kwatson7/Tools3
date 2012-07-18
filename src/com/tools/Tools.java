@@ -36,6 +36,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -51,6 +53,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
@@ -639,9 +642,10 @@ public class Tools {
 	/**
 	 * Determine if folder is empty. If it has empty folders in it, that is still considered empty.
 	 * @param folderPath The path to determine if it is empty.
+	 * @param ignoreFile a file name to be ignored, can be null or "" and is ignored. For example, ".nomedia" or "thumbnails.db"
 	 * @return true if folder is empty or only contains empty folders, false otherwise
 	 */
-	public static boolean isFolderEmpty(String folderPath){
+	public static boolean isFolderEmpty(String folderPath, String ignoreFile){
 		// create file object
 		File folder = new File(folderPath);
 
@@ -650,11 +654,17 @@ public class Tools {
 			// get the list of files and check if they themselves are empty
 			File[] files = folder.listFiles();
 			for (int i = 0; i < files.length; i++){
-				if (!isFolderEmpty(files[i].getAbsolutePath()))
+				if (!isFolderEmpty(files[i].getAbsolutePath(), ignoreFile))
 					return false;
 			}
-		}else
-			return false;
+		}else{
+			if (ignoreFile == null || ignoreFile.length() == 0)
+				return false;
+			else if (ignoreFile.compareTo(folder.getName()) == 0)
+				return true;
+			else
+				return false;
+		}
 
 		// if we got here, then it must be empty
 		return true;	
@@ -664,15 +674,17 @@ public class Tools {
 	 * Delete a folder and all of its sub folders given they are empty. <br>
 	 * If they are not empty, then nothing happens
 	 * @param folder The folder to delete
+	 * @param ignoreFile a file name to be ignored, can be null or "" and is ignored. For example, ".nomedia" or "thumbnails.db"
 	 */
-	public static void deleteEmptyFolder(File folder) {
-		if (!isFolderEmpty(folder.getAbsolutePath()))
+	public static void deleteEmptyFolder(File folder, String ignoreFile) {
+		if (!isFolderEmpty(folder.getAbsolutePath(), ignoreFile))
 			return;
+		
 		File[] files = folder.listFiles();
 		if(files!=null) { //some JVMs return null for empty dirs
 			for(File f: files) {
 				if(f.isDirectory()) {
-					deleteEmptyFolder(f);
+					deleteEmptyFolder(f, ignoreFile);
 				} else {
 					f.delete();
 				}
@@ -699,6 +711,22 @@ public class Tools {
 			builder.append(delim);
 		}
 		return builder.toString();
+	}
+	
+	/**
+	 * Get the bitmap from a given image view. Will return null if none available
+	 * @param image The imageView to extract bitmap from
+	 * @return The bitmap of the imageView, null if none.
+	 */
+	public static Bitmap getImageViewBitmap(ImageView image){
+		Drawable drawable = image.getDrawable();
+		Bitmap bitmap = null;
+		if (drawable instanceof BitmapDrawable) {
+			BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
+			bitmap = bitmapDrawable.getBitmap();
+		}
+		
+		return bitmap;
 	}
 
 	/**
