@@ -1,38 +1,54 @@
 package com.tools;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import android.annotation.TargetApi;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
+import android.graphics.PixelFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
+import android.hardware.SensorListener;
 import android.hardware.SensorManager;
 import android.hardware.Camera.Size;
+import android.os.Build;
+import android.util.Log;
 import android.view.OrientationEventListener;
+import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
 
-public class CameraHelper{
+public class CameraHelper
+implements SurfaceHolder.Callback{
 
-	//TODO: make sure we are not leaking
-	//TODO: incoroprate more from ShareBear>TakePicture.java into these calls.
-	//TODO: look into using weak references
-
+	// constants
+	private static int PIXEL_FORMAT = PixelFormat.RGB_565; 							// pixel format of preview
+	
 	// private member variables
 	private OrientationEventListener mOrientationEventListener; 					// The listener to call when orientation changes
 	private Orientation mOrientation = Orientation.ORIENTATION_LANDSCAPE_NORMAL;	// The current orientation of the camera
-	private int jpegQuality = 90; 													// quality of the image
+	private int jpegQuality; 														// quality of the image
 	private Camera mCamera = null; 													// The current camera
-	private Boolean mChangeParameters; 												// Do we change parameters inside this class?
 	private OnRotationCallback callback; 											// Call this when the phone orientation changes
 	private boolean isPreviewRunning = false;										// keep track if the preview is currently running.
 	private boolean isPreviewStarting = false; 										// keep track if we are currently in the process of starting preview
-	private String flashMode = Camera.Parameters.FLASH_MODE_AUTO;
+	private String flashMode = Camera.Parameters.FLASH_MODE_AUTO;					// the current flash mode
+	private SurfaceView surfaceView;												// The surface view to use
+	private SurfaceHolder surfaceHolder; 											// The surface holder of the view
+	private WidthHeight desiredCameraSize = null;									// the desired camera size, will be as close as possible, null = max
+	private boolean switchOrientation = true;										// if the screen should switch orientation, should alwasy be true... i think
+	private boolean isSurfaceInitialized = false;
+	private Activity act;															// The calling activity
+	private boolean isWaitingForPictureSave = false; 
+	private boolean isTryingToTakePicture = false;
+	private boolean isFocused = false;
+	private ExceptionCaught exceptionCaught;
+	private boolean isSurfaceCreated = false;
 	
 	// orientation enum
 	public enum Orientation{
@@ -62,18 +78,10 @@ public class CameraHelper{
 	 *      (2)this class's onPause in the calling activity's onPause<br>
 	 *      (3)this class's onCreate in the calling activity's onCreate<br>
 	 *      (4)this class's updateCam when the calling activity's camera is updated<br>
-	 * @param cam, pass null if not activated yet
 	 * @param jpegQuality 1-100, the jpeg quality, a good value is usually ~90
-	 * @param changeParameters, Boolean to change the parameters of the rotation in
-	 * the camera settings. This should be true if you want the camera drivers to rotate the 
-	 * image for you, or use getRotation() manually later to do it yourself
-	 * @param callback to happen when surface is rotated. Null if none desired
+	 * @param callback to be run when we have an exception with the camera. Can be null, but you will not be notified
 	 */
-	public CameraHelper(
-			Camera cam,
-			int jpegQuality,
-			Boolean changeParameters,
-			OnRotationCallback callback){
+	public CameraHelper(int jpegQuality, ExceptionCaught exceptionCaught){
 
 		// store image quality
 		if (jpegQuality < 1)
@@ -81,13 +89,30 @@ public class CameraHelper{
 		else if (jpegQuality > 100)
 			jpegQuality = 100;
 		this.jpegQuality = jpegQuality;
+		this.exceptionCaught = exceptionCaught;
+	}
+	
+	/**
+	 * call this in the calling activity's onCreate. MUST be done
+	 * @param act The calling activity
+	 * @param surfaceView The surfaceView to where the preview goes
+	 */
+	public void onCreate(Activity act, SurfaceView surfaceView){
 
-		// store camera
-		updateCam(cam);
+		// force portrait layout
+		act.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+		//act.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE | ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
 
 		// store other values
-		this.mChangeParameters = changeParameters;
-		this.callback = callback;
+		this.surfaceView = surfaceView;
+		surfaceHolder = surfaceView.getHolder();
+		this.act = act;
+		
+		// setup surface for holding camera
+		surfaceHolder.addCallback(this);
+		surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+		surfaceHolder.setFormat(PIXEL_FORMAT);
+		
 	}
 
 	/**
@@ -99,14 +124,15 @@ public class CameraHelper{
 	}
 
 	/**
-	 * call this in the calling activity's onResume. MUST be done
-	 * 
+	 * call this in the calling activity's onResume. MUST be done. Make sure to open a camera in onResume and use updateCam or use openFrontCamera
+	 * @param rotationCallback The callback for rotiaton, can be null
+	 * @param windowToFitSurface size of region to fit surface. make null if entire screen can be used
 	 */
-	public void onResume(Context ctx) {
+	public void onResume(OnRotationCallback rotationCallback, WidthHeight windowToFitSurface){
 
 		// prepare listener for orientation changes
 		if (mOrientationEventListener == null) {            
-			mOrientationEventListener = new OrientationEventListener(ctx, SensorManager.SENSOR_DELAY_NORMAL) {
+			mOrientationEventListener = new OrientationEventListener(act, SensorManager.SENSOR_DELAY_NORMAL) {
 
 				@Override
 				public void onOrientationChanged(int orientation) {
@@ -135,15 +161,120 @@ public class CameraHelper{
 		if (mOrientationEventListener.canDetectOrientation()) {
 			mOrientationEventListener.enable();
 		}
+		
+		setRotationCallback(rotationCallback);
+		
+		// set the size of the surface and camera and preview
+		try {
+			setSurfaceSizePreviewSizeCameraSize(act, windowToFitSurface);
+		} catch (CameraHelperException e) {
+			Log.e("CameraHelper", Log.getStackTraceString(e));
+			if (exceptionCaught != null)
+				exceptionCaught.onExceptionCaught(e);
+			return;
+		}
+		isSurfaceInitialized = true;
 	}
 
 	/**
 	 * call this in the calling activity's onPause. MUST be done
 	 */
 	public void onPause() {
+		setRotationCallback(null);
+		updateCam(null);
+		stopPreview();
 		mOrientationEventListener.disable();
 		mOrientationEventListener = null;
-		updateCam(null);
+		
+		isSurfaceInitialized = false;
+	}
+	
+	/**
+	 * Open the front facing camera and update the helper to this camera
+	 */
+	@SuppressLint("NewApi")
+	public void openFrontCamera(){
+
+		// get the api version
+		int currentApiVersion = android.os.Build.VERSION.SDK_INT;
+
+		// open the correct back facing camera
+		Camera camera = null;
+		if (currentApiVersion >= Build.VERSION_CODES.GINGERBREAD) {	
+			Camera.CameraInfo info=new Camera.CameraInfo();
+
+			// loop across all cameras
+			for (int i=0; i < Camera.getNumberOfCameras(); i++) {
+				Camera.getCameraInfo(i, info);
+
+				// open the back facing one
+				if (info.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
+					camera = Camera.open(i);
+					break;
+				}
+			}
+		}
+
+		updateCam(camera);
+
+		// no camera
+		if (camera == null){
+			Log.e("CameraHelper", "no accessible front facing camera");
+			if (exceptionCaught != null)
+				exceptionCaught.onExceptionCaught(new CameraHelperException("no accessible front facing camera"));
+		}
+	}
+	
+	/**
+	 * Open the back facing camera and update the helper to this camera
+	 * @throws CameraHelperException if we could not open a camera
+	 */
+	@SuppressLint("NewApi")
+	public void openBackCamera() throws CameraHelperException{
+		
+		// get the api version
+		int currentApiVersion = android.os.Build.VERSION.SDK_INT;
+		
+		// open the correct back facing camera
+		Camera camera = null;
+		if (currentApiVersion >= Build.VERSION_CODES.GINGERBREAD) {	
+			Camera.CameraInfo info=new Camera.CameraInfo();
+
+			// loop across all cameras
+			for (int i=0; i < Camera.getNumberOfCameras(); i++) {
+				Camera.getCameraInfo(i, info);
+
+				// open the back facing one
+				if (info.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
+					camera = Camera.open(i);
+					break;
+				}
+			}
+		}
+
+		// open the camera if it is still null
+		if (camera == null) {
+			camera = Camera.open();
+		}
+		
+		updateCam(camera);
+		
+		// no camera
+		if (camera == null)
+			throw new CameraHelperException("no accessible back facing camera");
+	}
+	
+	public static class CameraHelperException extends Exception{
+
+		private static final long serialVersionUID = 1L;
+
+		public CameraHelperException(){
+			super("Unknown Camera Error");
+		}
+		
+		public CameraHelperException(String error){
+			super(error);
+		}
 	}
 
 	/**
@@ -154,25 +285,17 @@ public class CameraHelper{
 	private void changeRotation(Orientation orientation, Orientation lastOrientation) {
 
 		// main switching of camera
+		/*
 		if (!(mChangeParameters == null || !mChangeParameters || mCamera == null)){
 			Camera.Parameters parameters = mCamera.getParameters();
 			parameters.setRotation(orientation.getAngle());
 			mCamera.setParameters(parameters);	
 		}
+		*/
 
 		// post callback
 		if (callback != null)
 			callback.onRotation(orientation.getAngle(), lastOrientation.getAngle());
-	}
-
-	/**
-	 * call this in the calling activity's onCreate. MUST be done
-	 */
-	public void onCreate(Activity act){
-
-		// force portrait layout
-		act.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-		//act.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE | ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
 	}
 
 	/** 
@@ -287,15 +410,31 @@ public class CameraHelper{
 		if (flashMode == null)
 			flashMode = Camera.Parameters.FLASH_MODE_AUTO;
 		
+		// release the old camera
+		if (mCamera != null){
+			try{
+				mCamera.release();
+			}catch(Exception e){
+				Log.e("CameraHelper", Log.getStackTraceString(e));
+			}
+		}
+		
 		// set new camera
 		mCamera = newCam;	
 
 		// set the quality
 		if (mCamera != null){
-			Parameters params = mCamera.getParameters();
-			params.setJpegQuality(jpegQuality);
-			mCamera.setParameters(params);
+			Camera.Parameters cameraParameters = mCamera.getParameters();
+			cameraParameters.setJpegQuality(jpegQuality);
+			mCamera.setParameters(cameraParameters);
 			setFlash(flashMode);
+			try {
+				mCamera.setPreviewDisplay(surfaceHolder);
+			} catch (IOException e) {
+				Log.e("CameraHelper", Log.getStackTraceString(e));
+				if (exceptionCaught != null)
+					exceptionCaught.onExceptionCaught(e);
+			} 
 		}
 	}
 
@@ -397,8 +536,102 @@ public class CameraHelper{
 		else
 			return params.getSupportedFlashModes();
 	}
+	
+	/**
+	 * Set the surfaceView size to be within the set limits and scaled correctly. Also set the camera and preivew size.
+	 * @param act An activity required to set some various parameters
+	 * @param windowSize The max WidthHeight to fit the preview in. Null if the full screen is desired.
+	 * @throws Exception if we cannot find sizes for preview or camera that are acceptable.
+	 */
+	public void setSurfaceSizePreviewSizeCameraSize(
+			Activity act,
+			WidthHeight windowSize)throws CameraHelperException {
 
+		// stop the preview
+		stopPreview();
 
+		// grab default parameters
+		Parameters params = getParameters();
+
+		// set orientation
+		int orientation = ((WindowManager) act.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay().getRotation();
+		int rotation = 0;
+		if (orientation == 0)
+			rotation = 90;
+		else if (orientation == 3)
+			rotation = 180;
+		else if (orientation == 1)
+			rotation = 0;
+		mCamera.setDisplayOrientation(rotation);
+
+		// get possible preview sizes and image sizes
+		List <Size> sizes = params.getSupportedPictureSizes();
+		List<Size> previewSizes = params.getSupportedPreviewSizes();
+
+		// determine the max camera size
+		WidthHeight max = new WidthHeight(0, 0);
+		long pix = 0;
+		for (Size item : sizes){
+			long tmp = item.height*item.width;
+			if (tmp > pix){
+				pix = tmp;
+				max.height=item.height;
+				max.width=item.width;
+			}
+		}
+
+		// max preview is window if null input
+		if (windowSize == null){
+			windowSize = new WidthHeight(
+					act.getWindowManager().getDefaultDisplay().getWidth(), 
+					act.getWindowManager().getDefaultDisplay().getHeight());
+		}
+		if (switchOrientation)
+			windowSize = windowSize.switchDimensions();
+
+		// get the image size that is closest to our optimal and set it
+		WidthHeight bestWidthHeight = null;
+		if (desiredCameraSize == null)
+			desiredCameraSize = max;
+		bestWidthHeight = getBestWidthHeight(sizes, max, desiredCameraSize);
+		if (bestWidthHeight == null){
+			throw new CameraHelperException("Could not find a camera size below maxWidthHeight and close to optimalWidthHeight");
+		}else{
+			params.setPictureSize(bestWidthHeight.width, bestWidthHeight.height);
+		}
+
+		// get the preview size that is closest to the image size
+		WidthHeight bestWidthHeightPreivew = null;
+		bestWidthHeightPreivew = 
+				getBestWidthHeight(previewSizes, max, bestWidthHeight);
+		if (bestWidthHeightPreivew == null)
+			throw new CameraHelperException("Could not find a camera preview size.");
+
+		// determine how best to fit camera preview into surface
+		params.setPreviewSize(bestWidthHeightPreivew.width, bestWidthHeightPreivew.height);
+		WidthHeight fitWindowWidthHeight = ImageProcessing.fitNoCrop(bestWidthHeightPreivew, windowSize);
+		if (switchOrientation)
+			fitWindowWidthHeight = fitWindowWidthHeight.switchDimensions();
+
+		// change height, but only if need be.
+		boolean shouldStart = false;
+		if (surfaceView.getWidth() != fitWindowWidthHeight.width ||
+				surfaceView.getHeight() != fitWindowWidthHeight.height){
+			LayoutParams surfaceParams = surfaceView.getLayoutParams();
+			surfaceParams.height = fitWindowWidthHeight.height;
+			surfaceParams.width = fitWindowWidthHeight.width;
+			surfaceView.setLayoutParams(surfaceParams);
+		}else
+			shouldStart = true;
+
+		// actually set the  parameters to camera
+		mCamera.setParameters(params);	
+		
+		// start the preview
+		if (!isWaitingForPictureSave && shouldStart)
+			startPreview();
+	}
+	
 	/**
 	 * Set the surfaceView size to be within the set limits and scaled correctly. Also set the camera and preivew size.
 	 * @param act An activity required to set some various parameters
@@ -409,13 +642,12 @@ public class CameraHelper{
 	 * @param surfaceView The surfaceView to manipulate.
 	 * @throws Exception if we cannot find sizes for preview or camera that are acceptable.
 	 */
-	public void setSurfaceSizePreviewSizeCameraSize(
+	public void setSurfaceSizePreviewSizeCameraSizeOld(
 			Activity act,
 			WidthHeight optimalWidthHeight,
 			WidthHeight maxWidthHeight,
 			WidthHeight windowSize,
-			boolean switchOrientation,
-			SurfaceView surfaceView)
+			boolean switchOrientation)
 					throws Exception {
 
 		// stop the preview
@@ -510,7 +742,6 @@ public class CameraHelper{
 	 * @param maxWidthHeight The max WidthHeight to make the camera size. Null if maximum is desired
 	 * @param windowSize The max WidthHeight to fit the preview in. Null if the full screen is desired.
 	 * @param switchOrientation if orientation of layout is opposite of orientation of camera. Usually true if layout is portrait.
-	 * @param surfaceView The surfaceView to manipulate.
 	 * @throws Exception if we cannot find sizes for preview or camera that are acceptable.
 	 */
 	public void setSurfacePreviewHolderSize(
@@ -518,19 +749,16 @@ public class CameraHelper{
 			WidthHeight optimalWidthHeight,
 			WidthHeight maxWidthHeight,
 			WidthHeight windowSize,
-			boolean switchOrientation,
-			SurfaceView surfaceView)
-					throws Exception {
+			boolean switchOrientation) throws Exception{
 
 		// stop the preview
 		stopPreview();
-
-		// grab default parameters
-		android.hardware.Camera.Parameters params = mCamera.getParameters();
+		
+		Camera.Parameters cameraParameters = getParameters();
 
 		// get possible preview sizes and image sizes
-		List <Size> sizes = params.getSupportedPictureSizes();
-		List<Size> previewSizes = params.getSupportedPreviewSizes();
+		List <Size> sizes = cameraParameters.getSupportedPictureSizes();
+		List<Size> previewSizes = cameraParameters.getSupportedPreviewSizes();
 
 		// determine the max camera size
 		WidthHeight max = new WidthHeight(0, 0);
@@ -594,8 +822,7 @@ public class CameraHelper{
 	 * If mCamera == null, then nothing will happen. This happens on a background thread.
 	 */
 	public synchronized void startPreview(){
-		//TODO: this used to be a synchronized method, see if iw need it
-		if (isPreviewStarting)
+		if (isPreviewStarting || !isSurfaceCreated)
 			return;
 		if (mCamera == null){
 			isPreviewRunning = false;
@@ -606,13 +833,13 @@ public class CameraHelper{
 			mCamera.stopPreview();
 
 		//TODO: see if we want a runnable, seems to leak and also may cause screen freeze
-		//	new Thread(new Runnable() {
-		//	public void run() {
-		mCamera.startPreview();
-		isPreviewRunning = true;
-		isPreviewStarting = false;
-		//	}
-		//	}).start();
+		new Thread(new Runnable() {
+			public void run() {
+				mCamera.startPreview();
+				isPreviewRunning = true;
+				isPreviewStarting = false;
+			}
+		}).start();
 	}
 
 	/**
@@ -626,7 +853,6 @@ public class CameraHelper{
 		if (isPreviewRunning)
 			mCamera.stopPreview();
 		isPreviewRunning = false;
-
 	}
 
 	/**
@@ -646,7 +872,7 @@ public class CameraHelper{
 	public boolean isPreviewRunning(){
 		return isPreviewRunning;
 	}
-
+	
 	public static abstract class OnRotationCallback{	
 		/**
 		 * Called when the orientation changes. Angles are 0, 90, 180, 270
@@ -654,5 +880,79 @@ public class CameraHelper{
 		 * @param lastOrientation The old orientation angle
 		 */
 		public abstract void onRotation(int orientation, int lastOrientation);
+	}
+
+	@Override
+	public void surfaceChanged(SurfaceHolder holder, int format, int width,
+			int height) {
+		if (!isSurfaceInitialized)
+			return;
+		
+		try{
+			// reset the size
+			setSurfaceSizePreviewSizeCameraSize(act, new WidthHeight(width, height));
+		}catch(CameraHelperException e1){
+			Log.e("CameraHelper", Log.getStackTraceString(e1));
+			if (exceptionCaught != null)
+				exceptionCaught.onExceptionCaught(e1);
+		}
+	}
+
+	@Override
+	public void surfaceCreated(SurfaceHolder holder) {
+		if (holder != surfaceHolder){
+			Log.e("CameraHelper", "surfaceHolders were not equal, we don't expect this to happen");
+			surfaceHolder = holder;
+		}
+		try {
+			mCamera.setPreviewDisplay(surfaceHolder);
+			isSurfaceCreated = true;
+		} catch (IOException e) {
+			Log.e("CameraHelper", Log.getStackTraceString(e));
+			if (exceptionCaught != null)
+				exceptionCaught.onExceptionCaught(e);
+		} 
+	}
+
+	@Override
+	public void surfaceDestroyed(SurfaceHolder holder) {
+		isSurfaceInitialized = false;
+		isSurfaceCreated = false;
+	}
+	
+	/**
+	 * Are we currently waiting for the picture to be saved?
+	 * @return
+	 */
+	public boolean isWaitingForPictureSave(){
+		return isWaitingForPictureSave;
+	}
+	
+	public void setIsWaitingForPictureSave(boolean isWaitingForPictureSave){
+		this.isWaitingForPictureSave = isWaitingForPictureSave;
+	}
+	
+	public void setTryingToTakePicture(boolean isTryingToTakePicture) {
+		this.isTryingToTakePicture = isTryingToTakePicture;
+	}
+
+	public boolean isTryingToTakePicture() {
+		return isTryingToTakePicture;
+	}
+	
+	public Camera getCamera(){
+		return mCamera;
+	}
+
+	public void setFocused(boolean isFocused) {
+		this.isFocused = isFocused;
+	}
+
+	public boolean isFocused() {
+		return isFocused;
+	}
+
+	public interface ExceptionCaught{
+		public void onExceptionCaught(Exception e);
 	}
 }

@@ -1,10 +1,13 @@
 package com.tools;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.Reader;
+import java.util.ArrayList;
 
 import android.annotation.TargetApi;
 import android.content.ContentValues;
@@ -215,6 +218,66 @@ public class ImageProcessing {
 			angle = 270;
 
 		return angle;
+	}
+	
+	/**
+	 * Helper class for rotating exif in the background
+	 * @author Kyle
+	 *
+	 * @param <ACTIVITY_TYPE>
+	 */
+	private static class RotateExifInBackgroundClass <ACTIVITY_TYPE extends CustomActivity>
+	extends CustomAsyncTask<ACTIVITY_TYPE, Void, IOException>{
+
+		private String filename;
+		private int direction;
+		
+		/**
+		 * Rotate exif data in the background
+		 * @param act Calling activity
+		 * @param filename the filename to rotate
+		 * @param direction The direction to rotate positive = clockwise, negative = ccw
+		 * @param callback Callback to call when finished, can be null
+		 */
+		public RotateExifInBackgroundClass(
+				ACTIVITY_TYPE act,
+				String filename,
+				int direction,
+				CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, IOException> callback) {
+			super(act, -1, true, false,
+					null);
+			this.filename = filename;
+			this.direction = direction;
+			
+			this.setFinishedCallback(callback);
+		}
+		
+		@Override
+		protected void onPreExecute() {
+		}
+		
+		@Override
+		protected IOException doInBackground(Void... params) {
+			IOException e2 = null;
+			try {
+				rotateExif(filename, direction);
+			} catch (IOException e) {
+				e2 = e;
+			}
+			return e2;
+		}
+		@Override
+		protected void onProgressUpdate(Void... progress) {
+			
+		}
+		@Override
+		protected void onPostExectueOverride(IOException result) {
+			
+		}
+		@Override
+		protected void setupDialog() {
+			
+		}	
 	}
 
 	/**
@@ -557,6 +620,22 @@ public class ImageProcessing {
 		// save the data
 		EI.setAttribute(ExifInterface.TAG_ORIENTATION, ""+exifOrientation);
 		EI.saveAttributes();
+	}
+	
+	/**
+	 * Rotate exif orientation of image in the background
+	 * @param <ACTIVITY_TYPE> The type of activity to return in callback (what activity called this)
+	 * @param act the activity calling this
+	 * @param filename The filename to rotate 
+	 * @param direction positive for 90 deg rotation clocwise and negative for ccw
+	 * @param callback The callback called when finished, IOException wil be null if no error occured
+	 */
+	public static <ACTIVITY_TYPE extends CustomActivity> void rotateExifBackground(
+			ACTIVITY_TYPE act,
+			String filename,
+			int direction,
+			CustomAsyncTask.FinishedCallback<ACTIVITY_TYPE, IOException> callback){
+		(new RotateExifInBackgroundClass<ACTIVITY_TYPE>(act, filename, direction, callback)).execute();
 	}
 
 	/** attempts to save byte data from camera to the next default location on the SDcard. 

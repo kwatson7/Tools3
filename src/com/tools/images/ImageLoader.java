@@ -369,6 +369,14 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				else
 					imageView.setImageResource(stub_id);
 	}
+	
+	/**
+	 * Null the reference at a particular picture id.
+	 * @param id The id to null at
+	 */
+	public void clearCacheAtId(ID_TYPE id){
+		memoryCache.clearCacheAt(id);
+	}
 
 	/**
 	 * Return the memory cache.<br>

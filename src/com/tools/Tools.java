@@ -109,6 +109,30 @@ public class Tools {
 	} 
 
 	/**
+	 * Log to debug the size of the native heap
+	 * @param clazz
+	 */
+	public static void logHeap() {
+		Double allocated = Double.valueOf(Debug.getNativeHeapAllocatedSize())/1048576.0;
+		Double free = Double.valueOf(Debug.getNativeHeapFreeSize())/1048576.0;
+	    Double available = Double.valueOf(Debug.getNativeHeapSize())/1048576.0;
+		DecimalFormat df = new DecimalFormat();
+		df.setMaximumFractionDigits(2);
+		df.setMinimumFractionDigits(2);
+
+		Log.d(LOG_TAG, "debug. =================================");
+		Log.d(LOG_TAG, "debug.heap native: allocated " + df.format(allocated) + "MB of " + df.format(available) + "MB (" + df.format(free) + "MB free");
+		Log.d(LOG_TAG, "debug.memory: allocated: " + df.format(Double.valueOf(Runtime.getRuntime().totalMemory()/1048576)) + "MB of " + df.format(Double.valueOf(Runtime.getRuntime().maxMemory()/1048576.0))+ "MB (" + df.format(Double.valueOf(Runtime.getRuntime().freeMemory()/1048576.0)) +"MB free)");
+		//System.gc();
+		//System.gc();
+
+		// don't need to add the following lines, it's just an app specific handling in my app        
+		//if (allocated>=(new Double(Runtime.getRuntime().maxMemory())/new Double((1048576))-MEMORY_BUFFER_LIMIT_FOR_RESTART)) {
+		//     android.os.Process.killProcess(android.os.Process.myPid());
+		// }
+	}
+
+	/**
 	 * Convert an angle to a string formatted as follows: <br>
 	 * deg/1,min/1,sec*1000/1000, for example,
 	 * 15.246 as an input would yield: <br>
@@ -138,7 +162,7 @@ public class Tools {
 	public static String getMyPhoneNumber(Activity act){  
 		TelephonyManager mTelephonyMgr;  
 		mTelephonyMgr = (TelephonyManager)  
-				act.getSystemService(Context.TELEPHONY_SERVICE);   
+		act.getSystemService(Context.TELEPHONY_SERVICE);   
 		return mTelephonyMgr.getLine1Number(); 
 	}  
 
@@ -412,7 +436,7 @@ public class Tools {
 		Uri inserted = null;
 		try{
 			inserted = ctx.getContentResolver().insert
-					(Uri.parse("content://sms//sent"), values);
+			(Uri.parse("content://sms//sent"), values);
 		}catch(Exception e){
 			Log.e(LOG_TAG, Log.getStackTraceString(e));
 		}
@@ -505,7 +529,7 @@ public class Tools {
 
 		// the output string
 		String output = "";
-		
+
 		// keep track of how many categories we have shown
 		int categoriesShown = 0;
 		if (maxCategories == -1)
@@ -679,7 +703,7 @@ public class Tools {
 	public static void deleteEmptyFolder(File folder, String ignoreFile) {
 		if (!isFolderEmpty(folder.getAbsolutePath(), ignoreFile))
 			return;
-		
+
 		File[] files = folder.listFiles();
 		if(files!=null) { //some JVMs return null for empty dirs
 			for(File f: files) {
@@ -712,7 +736,7 @@ public class Tools {
 		}
 		return builder.toString();
 	}
-	
+
 	/**
 	 * Get the bitmap from a given image view. Will return null if none available
 	 * @param image The imageView to extract bitmap from
@@ -725,7 +749,7 @@ public class Tools {
 			BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
 			bitmap = bitmapDrawable.getBitmap();
 		}
-		
+
 		return bitmap;
 	}
 
@@ -845,7 +869,7 @@ public class Tools {
 		// return true
 		return true;
 	}
-	
+
 	/**
 	 * Determine if the external storage is currently mounted
 	 * @param requireWriteAccess true to require write access and false to only require read access
@@ -853,21 +877,21 @@ public class Tools {
 	 */
 	static public boolean isStorageAvailable(boolean requireWriteAccess) {
 
-	    String state = Environment.getExternalStorageState();
+		String state = Environment.getExternalStorageState();
 
-	    if (Environment.MEDIA_MOUNTED.equals(state)) {
-	        if (requireWriteAccess) {
-	            boolean writable = checkFsWritable();
-	            return writable;
-	        } else {
-	            return true;
-	        }
-	    } else if (!requireWriteAccess && Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
-	        return true;
-	    }
-	    return false;
+		if (Environment.MEDIA_MOUNTED.equals(state)) {
+			if (requireWriteAccess) {
+				boolean writable = checkFsWritable();
+				return writable;
+			} else {
+				return true;
+			}
+		} else if (!requireWriteAccess && Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+			return true;
+		}
+		return false;
 	}
-	
+
 	/**
 	 * Check if the file system is writable.
 	 *  Create a temporary file to see whether a volume is really writeable.
@@ -876,17 +900,17 @@ public class Tools {
 	 * @return true if we can write to the external file system, and false otherwise
 	 */
 	private static boolean checkFsWritable() {
-        
-        String directoryName = Environment.getExternalStorageDirectory().toString() + "/DCIM";
-        File directory = new File(directoryName);
-        if (!directory.isDirectory()) {
-            if (!directory.mkdirs()) {
-                return false;
-            }
-        }
-        return directory.canWrite();
-    }
-	
+
+		String directoryName = Environment.getExternalStorageDirectory().toString() + "/DCIM";
+		File directory = new File(directoryName);
+		if (!directory.isDirectory()) {
+			if (!directory.mkdirs()) {
+				return false;
+			}
+		}
+		return directory.canWrite();
+	}
+
 	/**
 	 * Read a file into a byte[]. Output will be null if file cannot be read <br>
 	 * @See ImageProcessing.readFullFile ***
@@ -1036,7 +1060,7 @@ public class Tools {
 		Matcher matcher;
 
 		final String EMAIL_PATTERN = 
-				"^[_A-Za-z0-9-]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
+			"^[_A-Za-z0-9-]+(\\.[_A-Za-z0-9-]+)*@[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
 
 		pattern = Pattern.compile(EMAIL_PATTERN);
 
@@ -1059,7 +1083,7 @@ public class Tools {
 			String filePath,
 			final long dataLength,
 			ProgressBar progressBar)
-					throws IOException{
+	throws IOException{
 
 		// store weakReference
 		WeakReference<ProgressBar> weakProgress = new WeakReference<ProgressBar>(progressBar);
@@ -1158,7 +1182,7 @@ public class Tools {
 	 * @throws IOException Throws an exception if we couldn't create the path
 	 */
 	public static void writeRequiredFolders(String filePath)
-			throws IOException{
+	throws IOException{
 
 		// no file
 		if (filePath == null || filePath.length() == 0)
@@ -1180,7 +1204,7 @@ public class Tools {
 
 
 
-//TODO: the below class need to be commented and/or verified
+	//TODO: the below class need to be commented and/or verified
 
 	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
@@ -1235,7 +1259,7 @@ public class Tools {
 			ctx = applicationContext.getApplicationContext();
 		if (ctx == null && act != null)
 			ctx = act.getApplicationContext();
-		
+
 		AlertDialog dialog = null;
 
 		try{
@@ -1274,7 +1298,7 @@ public class Tools {
 				}
 			}
 		}
-		
+
 		return dialog;
 	}
 }

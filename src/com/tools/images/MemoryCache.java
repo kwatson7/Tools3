@@ -1,7 +1,7 @@
 package com.tools.images;
 
 import java.lang.ref.SoftReference;
-import java.lang.ref.WeakReference;
+import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
@@ -18,8 +18,8 @@ import android.graphics.Bitmap;
 public class MemoryCache <ID_TYPE> {
 	
 	// private variables
-    private HashMap<ID_TYPE, TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>>> cache = 
-    	new HashMap<ID_TYPE, TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>>>(); 			// Hashmap holding thumbnail and full image bmp
+    private HashMap<ID_TYPE, TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>>> cache = 
+    	new HashMap<ID_TYPE, TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>>>(); 			// Hashmap holding thumbnail and full image bmp
     
     /**
      * store the thumbnail in this memory cache
@@ -30,11 +30,11 @@ public class MemoryCache <ID_TYPE> {
     	if (bitmap == null)
     		return;
     	// get the map object
-    	TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>> data = cache.get(pictureRowId);
+    	TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>> data = cache.get(pictureRowId);
     	
     	// null data
     	if (data == null){
-    		data = new  TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>>
+    		data = new  TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>>
     		(new SoftReference<Bitmap>(bitmap), null);
     	}else{
     		// put the thumbnail in the correct spot
@@ -55,19 +55,27 @@ public class MemoryCache <ID_TYPE> {
     		return;
     	
     	// get the map object
-    	TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>> data = cache.get(pictureRowId);
+    	TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>> data = cache.get(pictureRowId);
     	
     	// null data
     	if (data == null){
-    		data = new  TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>>
-    		(null, new WeakReference<Bitmap>(bitmap));
+    		data = new  TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>>
+    		(null, new SoftReference<Bitmap>(bitmap));
     	}else{
     		// put the full picture in the correct spot
-    		data.mObject2 = new WeakReference<Bitmap>(bitmap);
+    		data.mObject2 = new SoftReference<Bitmap>(bitmap);
     	}
     	
     	// store in cache
         cache.put(pictureRowId, data);
+    }
+    
+    /**
+     * Clear the bitmaps at the given key
+     * @param pictureRowId
+     */
+    protected synchronized void clearCacheAt(ID_TYPE pictureRowId){
+    	cache.remove(pictureRowId);
     }
 
     /**
@@ -108,7 +116,7 @@ public class MemoryCache <ID_TYPE> {
     		return null;
     	
     	// get the map object
-    	TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>> data = cache.get(pictureRowId);
+    	TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>> data = cache.get(pictureRowId);
     	
     	// now return the actual bitmap
     	if (data != null && data.mObject1 != null){
@@ -132,7 +140,7 @@ public class MemoryCache <ID_TYPE> {
     		return null;
     	
     	// get the map object
-    	TwoObjects<SoftReference<Bitmap>, WeakReference<Bitmap>> data = cache.get(pictureRowId);
+    	TwoObjects<SoftReference<Bitmap>, SoftReference<Bitmap>> data = cache.get(pictureRowId);
     	
     	// now return the actual bitmap
     	if (data != null && data.mObject2 != null){
