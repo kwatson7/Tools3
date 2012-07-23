@@ -585,9 +585,12 @@ public class ImageProcessing {
 
 		// open the exif data
 		ExifInterface EI = new ExifInterface(fileName);
+		File file = new File(fileName);
+		if (!file.exists() || !file.canRead() || !file.canWrite() || !file.isFile())
+			throw new IOException("File can't be read");
 
 		// get the angle
-		float angle = ImageProcessing.getExifOrientationAngle(fileName);
+		float angle = ImageProcessing.getExifOrientationAngle(EI);
 
 		// rotate the angle
 		if (direction < 0)

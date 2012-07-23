@@ -864,6 +864,7 @@ public class Tools {
 		// create and load the message and subject
 		sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
 		sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, body);
+		sharingIntent.putExtra(Intent.EXTRA_TITLE, body);
 
 		// put picture in intent
 		sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
