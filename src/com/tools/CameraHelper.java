@@ -905,8 +905,10 @@ implements SurfaceHolder.Callback{
 			surfaceHolder = holder;
 		}
 		try {
-			mCamera.setPreviewDisplay(surfaceHolder);
-			isSurfaceCreated = true;
+			if (mCamera != null){
+				mCamera.setPreviewDisplay(surfaceHolder);
+				isSurfaceCreated = true;
+			}
 		} catch (IOException e) {
 			Log.e("CameraHelper", Log.getStackTraceString(e));
 			if (exceptionCaught != null)

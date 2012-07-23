@@ -796,6 +796,7 @@ public class Tools {
 	 * @param notificationId An id used to keep track of what notification this is. If
 	 * you post a new notification with the same ID, and an old one is still present,
 	 * the old one will be overwritten.
+	 * @param playSound should we play the default notification sound?
 	 * @param intentToLaunch the intent to launch when the user click the notification. Use null for nothing.
 	 */
 	public static void postNotification(
@@ -805,6 +806,7 @@ public class Tools {
 			String contentTitle,
 			String contentText,
 			int notificationId,
+			boolean playSound,
 			Intent intentToLaunch){
 
 		// load the manager
@@ -815,8 +817,11 @@ public class Tools {
 		long when = System.currentTimeMillis();
 		Notification notification = new Notification(icon, tickerText, when);
 		notification.flags |= Notification.FLAG_AUTO_CANCEL;
-		notification.defaults =  Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND;
-
+		if (playSound)
+			notification.defaults =  Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND;
+		else
+			notification.defaults =  Notification.DEFAULT_LIGHTS;
+		
 		//Define the notification's message and PendingIntent:
 		Context context = ctx.getApplicationContext();
 		if (intentToLaunch == null)
