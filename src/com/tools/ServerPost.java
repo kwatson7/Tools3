@@ -196,26 +196,44 @@ public class ServerPost {
 					else
 						serverReturnValue = serverReturnValueLastLine;
 				}else{
+					// ammend .tmp to file
+					String tmpFile = new String(filePath + ".part");
+					
 					// read the response as a file
+					ServerReturn out;
 					if (binaryDownloader == null){
-						long count = com.tools.Tools.writeInputStreamToFile(content, filePath, dataLength, weakProgress.get());
+						long count = com.tools.Tools.writeInputStreamToFile(content, tmpFile, dataLength, weakProgress.get());
 						if (count > 0)
-							return new ServerReturn(true);
+							out =  new ServerReturn(true);
 						else{
-							ServerReturn out = new ServerReturn();
+							out = new ServerReturn();
 							out.setError(ServerReturn.CODE_NO_BYTES_WRITTEN, ServerReturn.NO_BYTES_WRITTEN_STRING);
-							return out;
 						}
 					}else{
-						SuccessReason result = binaryDownloader.readInputStream(content, filePath, dataLength, weakProgress);
+						SuccessReason result = binaryDownloader.readInputStream(content, tmpFile, dataLength, weakProgress);
 						if (result.getSuccess())
-							return new ServerReturn(result.getReason(), result.getReason());
+							out = new ServerReturn(result.getReason(), result.getReason());
 						else{
-							ServerReturn out = new ServerReturn();
+							out = new ServerReturn();
 							out.setError(ServerReturn.BAD_CUSTOM_BINARY_RETURN, result.getReason());
-							return out;
 						}
 					}
+					
+					// successful download, move file
+					if (out.isSuccess()){
+						File oldFile = new File(tmpFile);
+						File newFile = new File(filePath);
+						if (oldFile.exists() && oldFile.isFile()){
+							if (newFile.exists())
+								newFile.delete();
+							boolean success = oldFile.renameTo(newFile);
+							if (!success){
+								out.setError(new IOException("Temp file could not be renamed"));
+							}
+						}	
+					}
+					
+					return out;
 				}
 
 				// bad return code
