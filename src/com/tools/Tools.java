@@ -1,6 +1,7 @@
 package com.tools;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -10,6 +11,7 @@ import java.io.RandomAccessFile;
 import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.channels.FileChannel;
 import java.security.SecureRandom;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -1306,5 +1308,46 @@ public class Tools {
 		}
 
 		return dialog;
+	}
+	
+	/**
+	 * Copy file. Will create folders if needed
+	 * @param sourceFile the source file 
+	 * @param destFile the destination file
+	 * @throws IOException
+	 */
+	public static void copyFile(File sourceFile, File destFile) throws IOException {
+		// create required folders
+		writeRequiredFolders(destFile.getAbsolutePath());
+		
+		// make the new file
+	    if(!destFile.exists()) {
+	        destFile.createNewFile();
+	    }
+
+	    FileChannel source = null;
+	    FileChannel destination = null;
+	    try {
+	    	
+	    	// open file streams
+	        source = new FileInputStream(sourceFile).getChannel();
+	        destination = new FileOutputStream(destFile).getChannel();
+
+	        // previous code: destination.transferFrom(source, 0, source.size());
+	        // to avoid infinite loops, should be:
+	        long count = 0;
+	        long size = source.size();              
+	        while((count += destination.transferFrom(source, count, size-count))<size);
+	    }
+	    finally {
+	    	
+	    	// clean up
+	        if(source != null) {
+	            source.close();
+	        }
+	        if(destination != null) {
+	            destination.close();
+	        }
+	    }
 	}
 }

@@ -652,6 +652,7 @@ public class ImageProcessing {
 	 * @param fileNameInput write data to this filename. If null, then writes to next available file on external storage
 	 * @param exifOrientation the orientation to store in exif header. See ExifInterface for details. Input null to not save anything.
 	 * @param showImageInScanner boolean to show the image in the media scanner. Usually true
+	 * @return if we successfully wrote the file, the reason will be the filename, if we failed, the reason is teh reason we failed
 	 * */
 	@TargetApi(8)
 	public static SuccessReason saveByteDataToFile(
