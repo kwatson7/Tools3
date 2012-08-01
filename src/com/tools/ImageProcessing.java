@@ -391,7 +391,7 @@ public class ImageProcessing {
 	 * to do with image that doesn't fit new size. 
 	 * @param ctx context, usually getApplicationContext,
 	 * @param newWidthHeight New desired width and height
-	 * @param orientationAngle gloat for the orientation of the byte array. 
+	 * @param orientationAngle float for the orientation of the byte array. 
 	 * @throws IllegalArgumentException if cropFlag is not the right input type
 	 */
 	public static Bitmap resizeByteArray(

@@ -79,9 +79,12 @@ implements SurfaceHolder.Callback{
 	 *      (3)this class's onCreate in the calling activity's onCreate<br>
 	 *      (4)this class's updateCam when the calling activity's camera is updated<br>
 	 * @param jpegQuality 1-100, the jpeg quality, a good value is usually ~90
-	 * @param callback to be run when we have an exception with the camera. Can be null, but you will not be notified
+	 * @param exceptionCaught to be run when we have an exception with the camera. Can be null, but you will not be notified
 	 */
 	public CameraHelper(int jpegQuality, ExceptionCaught exceptionCaught){
+		
+		//TODO: should we have an exceptionCaught or actually throw the exception?
+		//TODO: on bad camera load, we will get a null pointer exception. Should deal with this somehow
 
 		// store image quality
 		if (jpegQuality < 1)
@@ -230,7 +233,7 @@ implements SurfaceHolder.Callback{
 	 * @throws CameraHelperException if we could not open a camera
 	 */
 	@SuppressLint("NewApi")
-	public void openBackCamera() throws CameraHelperException{
+	public void openBackCamera(){
 		
 		// get the api version
 		int currentApiVersion = android.os.Build.VERSION.SDK_INT;
@@ -260,8 +263,11 @@ implements SurfaceHolder.Callback{
 		updateCam(camera);
 		
 		// no camera
-		if (camera == null)
-			throw new CameraHelperException("no accessible back facing camera");
+		if (camera == null){
+			Log.e("CameraHelper", "no accessible front facing camera");
+			if (exceptionCaught != null)
+				exceptionCaught.onExceptionCaught(new CameraHelperException("no accessible back facing camera"));
+		}
 	}
 	
 	public static class CameraHelperException extends Exception{

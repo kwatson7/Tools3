@@ -948,6 +948,23 @@ public class Tools {
 
 		return b;
 	}
+	
+	/**
+	 * Recycle the bitmap of the given imageView. If there is no bitmap, no action, and no error
+	 * @param imageView The imageView to recycle the bitmap of
+	 */
+	public static void recycleImageViewBitmap(ImageView imageView){
+		
+		// delete imageview bitmap
+		if (imageView != null){
+			Drawable drawable = imageView.getDrawable();
+			if (drawable != null && drawable instanceof BitmapDrawable) {
+				BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
+				Bitmap bitmap = bitmapDrawable.getBitmap();
+				bitmap.recycle();
+			}
+		}
+	}
 
 	/**
 	 * Save the view and all its children to a bitmap. if View is null, null is returned <br>
