@@ -27,6 +27,7 @@ import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -1226,11 +1227,46 @@ public class Tools {
 			if(!parent.mkdirs())
 				throw new IOException("Cannot create folder " + parent.getAbsolutePath());
 	}
+	
+	/**
+	 * Launch gmail intent (if found on device) to a new screen with the given search.
+	 * @param ctx Context required to launch intent
+	 * @param searchQuery The search query
+	 * @throws Exception thrown if gmail client not found on device
+	 */
+	public static void launchGmailSearchDOESNTWORK(Context ctx, String searchQuery)
+			throws Exception{
+		try{
+			Intent mailClient = new Intent(Intent.ACTION_SEARCH);
+			mailClient.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			mailClient.setClassName("com.google.android.gm", "com.google.android.gm.ConversationListActivity");
+			mailClient.putExtra("query", "Share Bear");
+			ctx.startActivity(mailClient);
+		}catch (ActivityNotFoundException e){
+			throw new Exception("Gmail not on device");
+		}
+	}
+	
+	/**
+	 * Launch gmail intent (if found on device)
+	 * @param ctx Context required to launch intent
+	 * @throws Exception thrown if gmail client not found on device
+	 */
+	public static void launchGmailAppDOESNWORK(Context ctx)
+			throws Exception{
+		try{
+			Intent gmintent = new Intent(Intent.ACTION_VIEW); 
+			gmintent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			gmintent.setClassName("com.google.android.gm", "com.google.android.gm.ConversationListActivityGoogleMail"); 
+			ctx.startActivity(gmintent);
+		}catch (ActivityNotFoundException e){
+			throw new Exception("Gmail not on device");
+		}
+	}
 
-
-
+	
+	
 	//TODO: the below class need to be commented and/or verified
-
 	/**
 	 * Read a picture from the given path, return null if unsuffessful <br>
 	 * Make sure to NOT call on main UI thread because it's slow <br>
