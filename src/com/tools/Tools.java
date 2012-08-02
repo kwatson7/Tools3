@@ -42,6 +42,8 @@ import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.ExifInterface;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Debug;
@@ -447,6 +449,21 @@ public class Tools {
 		return inserted;
 	}
 
+	/**
+	 * Determine if we have an internet connection or in the middle of aquireing one
+	 * @param ctx Required to check
+	 * @return true if connected or connectiong and false otherwise
+	 */
+	public static boolean isOnline(Context ctx) {
+	    ConnectivityManager cm =
+	        (ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+	    NetworkInfo netInfo = cm.getActiveNetworkInfo();
+	    if (netInfo != null && netInfo.isConnectedOrConnecting()) {
+	        return true;
+	    }
+	    return false;
+	}
+	
 	/**
 	 * Show a dialog that will only be shown once at startup. 
 	 * @param ctx The context where this dialog will be displayed

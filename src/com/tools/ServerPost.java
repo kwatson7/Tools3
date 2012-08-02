@@ -39,7 +39,7 @@ import android.widget.ProgressBar;
 public class ServerPost {
 
 	// constants
-	private final Charset ENCODING_TYPE = Charset.forName("UTF-8"); // the type of the data
+	private static final Charset ENCODING_TYPE = Charset.forName("UTF-8"); // the type of the data
 	private static final int RANDOM_FILENAME_LENGTH = 64; 			// if we create a random filename, the length of the filename
 	private static final int GOOD_RETURN_CODE = 200; 				// The return code for a successful sync with server
 	private static final String LOG_TAG = "ServerPost"; 			// The log tag
