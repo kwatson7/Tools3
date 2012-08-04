@@ -24,7 +24,7 @@ extends Activity {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
-		setContentView(R.layout.transparant);
+//		setContentView(R.layout.transparant);
 
 		// initialize variables
 		String title=null;
