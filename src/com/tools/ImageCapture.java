@@ -23,6 +23,7 @@ public class ImageCapture {
 	private static final String BITMAP_KEY = "ImageCapture.BITMAP_KEY";
 	private static final String FILE_PATH_KEY = "ImageCapture.FILE_PATH_KEY";
 	private static final String FILE_URI_KEY = "ImageCapture.FILE_URI_KEY";
+	private static final String KEY_TO_DELETE_PICTURE = "KEY_TO_DELETE_PICTURE";
 
 	// member variables
 	private String filePath = null;
@@ -126,11 +127,12 @@ public class ImageCapture {
 	 * @param data The data returned from camera
 	 * @return the new intent. null if there is no data returned from camera
 	 */
-	public Intent createIntentWithCorrectExtras(Context ctx, Class<?> newClassToStart, int resultCode, Intent data){
+	public Intent createIntentWithCorrectExtrasAfterCapture(Context ctx, Class<?> newClassToStart, int resultCode, Intent data){
 
 		if (resultCode == Activity.RESULT_OK){
 			// create the new intent
 			Intent intent = new Intent(ctx, newClassToStart);
+			intent.putExtra(KEY_TO_DELETE_PICTURE, true);
 
 			// add the bitmap data if present
 			if (data != null){
@@ -157,9 +159,10 @@ public class ImageCapture {
 	 * @param newClassToStart the new activity to start
 	 * @param bitmap any bitmap data usuall only for small files
 	 * @param filePath the filepath where the image is stored bigger files
+	 * @param toDelete If the picture file (if present) should be deleted when finished being read in getBitmap
 	 * @return the intent to lauch the activity with knowledge of bitmaps
 	 */
-	public static Intent createIntentToPassPhoto(Context ctx, Class<?> newClassToStart, Bitmap bitmap, String filePath){
+	public static Intent createIntentToPassPhoto(Context ctx, Class<?> newClassToStart, Bitmap bitmap, String filePath, boolean toDelete){
 
 		// create the new intent
 		Intent intent = new Intent(ctx, newClassToStart);
@@ -172,6 +175,8 @@ public class ImageCapture {
 		// now add the path to the file
 		if (filePath != null && filePath.length() > 0 && (new File(filePath)).exists())
 			intent.putExtra(FILE_PATH_KEY, filePath);
+		
+		intent.putExtra(KEY_TO_DELETE_PICTURE, toDelete);
 
 		return intent;
 	}
@@ -180,10 +185,9 @@ public class ImageCapture {
 	 * Get the bitmap from the Bundle scaled down to fit the screen
 	 * @param act the activity this is called within, so we can set the maximum picture size to be within window
 	 * @param extras the extras containing the data
-	 * @param deleteFile should we delete the temporary file, once getting the data
 	 * @return the bitmap
 	 */
-	public static Bitmap getBitmap(Activity act, Bundle extras, boolean deleteFile){
+	public static Bitmap getBitmap(Activity act, Bundle extras){
 		// no extras
 		if (extras == null)
 			return null;
@@ -192,6 +196,9 @@ public class ImageCapture {
 		Display display = act.getWindowManager().getDefaultDisplay();
 		int maxPixelSize = Math.max(display.getWidth(), display.getHeight()); 
 		String path = null;
+		
+		// should we delte picture
+		boolean deleteFile = extras.getBoolean(KEY_TO_DELETE_PICTURE,false);
 		
 		// try to read the big file first
 		path = extras.getString(FILE_PATH_KEY);

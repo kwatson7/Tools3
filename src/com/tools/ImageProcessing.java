@@ -370,7 +370,7 @@ public class ImageProcessing {
 		try {
 			exif = new ExifInterface(fullImagePath);
 		} catch (IOException e) {
-			Log.e("TAG", Log.getStackTraceString(e));
+			Log.e(LOG_TAG, Log.getStackTraceString(e));
 			return null;
 		}
 		int orientation = exif.getAttributeInt(

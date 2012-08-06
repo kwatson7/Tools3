@@ -156,9 +156,17 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 			float angle,
 			int desiredWidth,
 			int desiredHeight){
+		
 		try{
 			if (inputData != null && inputData.length != 0){
 
+				// if angle is 90 or 270, then switch height and width
+				if (Math.round(angle+90) % 180 == 0){
+					int tmp = desiredHeight;
+					desiredHeight = desiredWidth;
+					desiredWidth = tmp;
+				}
+				
 				//decode image size
 				BitmapFactory.Options o = new BitmapFactory.Options();
 				o.inJustDecodeBounds = true;
@@ -177,7 +185,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 				
 				if(bitmap == null)
 					return null;
-
+				
 				// now do the rotation
 				if (angle != 0) {
 					Matrix matrix = new Matrix();
@@ -212,7 +220,16 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 
 		try{
 			if (path != null && path.length() != 0 && (new File(path)).exists()){
-
+				
+				float angle =  ImageProcessing.getExifOrientationAngle(path);	
+				
+				// if angle is 90 or 270, then switch height and width
+				if (Math.round(angle+90) % 180 == 0){
+					int tmp = desiredHeight;
+					desiredHeight = desiredWidth;
+					desiredWidth = tmp;
+				}
+				
 				// make the file
 				File file = new File(path);
 
@@ -251,9 +268,7 @@ public class ImageLoader<ID_TYPE, THUMBNAIL_TYPE, FULL_IMAGE_TYPE>{
 					}
 				}
 				if(bitmap == null)
-					return null;
-				
-				float angle =  ImageProcessing.getExifOrientationAngle(path);		
+					return null;	
 
 				// now do the rotation
 				if (angle != 0) {
