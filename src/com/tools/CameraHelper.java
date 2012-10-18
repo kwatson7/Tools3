@@ -12,6 +12,8 @@ import android.content.pm.ActivityInfo;
 import android.graphics.PixelFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
+import android.hardware.Camera.PictureCallback;
+import android.hardware.Camera.ShutterCallback;
 import android.hardware.SensorListener;
 import android.hardware.SensorManager;
 import android.hardware.Camera.Size;
@@ -28,7 +30,7 @@ implements SurfaceHolder.Callback{
 
 	// constants
 	private static int PIXEL_FORMAT = PixelFormat.RGB_565; 							// pixel format of preview
-	
+
 	// private member variables
 	private OrientationEventListener mOrientationEventListener; 					// The listener to call when orientation changes
 	private Orientation mOrientation = Orientation.ORIENTATION_LANDSCAPE_NORMAL;	// The current orientation of the camera
@@ -49,7 +51,7 @@ implements SurfaceHolder.Callback{
 	private boolean isFocused = false;
 	private ExceptionCaught exceptionCaught;
 	private boolean isSurfaceCreated = false;
-	
+
 	// orientation enum
 	public enum Orientation{
 		ORIENTATION_PORTRAIT_NORMAL(90),ORIENTATION_LANDSCAPE_NORMAL(0),
@@ -82,7 +84,7 @@ implements SurfaceHolder.Callback{
 	 * @param exceptionCaught to be run when we have an exception with the camera. Can be null, but you will not be notified
 	 */
 	public CameraHelper(int jpegQuality, ExceptionCaught exceptionCaught){
-		
+
 		//TODO: should we have an exceptionCaught or actually throw the exception?
 		//TODO: on bad camera load, we will get a null pointer exception. Should deal with this somehow
 
@@ -94,7 +96,7 @@ implements SurfaceHolder.Callback{
 		this.jpegQuality = jpegQuality;
 		this.exceptionCaught = exceptionCaught;
 	}
-	
+
 	/**
 	 * call this in the calling activity's onCreate. MUST be done
 	 * @param act The calling activity
@@ -110,12 +112,12 @@ implements SurfaceHolder.Callback{
 		this.surfaceView = surfaceView;
 		surfaceHolder = surfaceView.getHolder();
 		this.act = act;
-		
+
 		// setup surface for holding camera
 		surfaceHolder.addCallback(this);
 		surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 		surfaceHolder.setFormat(PIXEL_FORMAT);
-		
+
 	}
 
 	/**
@@ -164,9 +166,9 @@ implements SurfaceHolder.Callback{
 		if (mOrientationEventListener.canDetectOrientation()) {
 			mOrientationEventListener.enable();
 		}
-		
+
 		setRotationCallback(rotationCallback);
-		
+
 		// set the size of the surface and camera and preview
 		try {
 			setSurfaceSizePreviewSizeCameraSize(act, windowToFitSurface);
@@ -188,10 +190,10 @@ implements SurfaceHolder.Callback{
 		stopPreview();
 		mOrientationEventListener.disable();
 		mOrientationEventListener = null;
-		
+
 		isSurfaceInitialized = false;
 	}
-	
+
 	/**
 	 * Open the front facing camera and update the helper to this camera
 	 */
@@ -227,17 +229,17 @@ implements SurfaceHolder.Callback{
 				exceptionCaught.onExceptionCaught(new CameraHelperException("no accessible front facing camera"));
 		}
 	}
-	
+
 	/**
 	 * Open the back facing camera and update the helper to this camera
 	 * @throws CameraHelperException if we could not open a camera
 	 */
 	@SuppressLint("NewApi")
 	public void openBackCamera(){
-		
+
 		// get the api version
 		int currentApiVersion = android.os.Build.VERSION.SDK_INT;
-		
+
 		// open the correct back facing camera
 		Camera camera = null;
 		if (currentApiVersion >= Build.VERSION_CODES.GINGERBREAD) {	
@@ -259,9 +261,9 @@ implements SurfaceHolder.Callback{
 		if (camera == null) {
 			camera = Camera.open();
 		}
-		
+
 		updateCam(camera);
-		
+
 		// no camera
 		if (camera == null){
 			Log.e("CameraHelper", "no accessible front facing camera");
@@ -269,7 +271,7 @@ implements SurfaceHolder.Callback{
 				exceptionCaught.onExceptionCaught(new CameraHelperException("no accessible back facing camera"));
 		}
 	}
-	
+
 	public static class CameraHelperException extends Exception{
 
 		private static final long serialVersionUID = 1L;
@@ -277,7 +279,7 @@ implements SurfaceHolder.Callback{
 		public CameraHelperException(){
 			super("Unknown Camera Error");
 		}
-		
+
 		public CameraHelperException(String error){
 			super(error);
 		}
@@ -297,7 +299,7 @@ implements SurfaceHolder.Callback{
 			parameters.setRotation(orientation.getAngle());
 			mCamera.setParameters(parameters);	
 		}
-		*/
+		 */
 
 		// post callback
 		if (callback != null)
@@ -388,7 +390,7 @@ implements SurfaceHolder.Callback{
 		mCamera.setParameters(params);
 		return true;
 	}
-	
+
 	/**
 	 * Get the current flashmode. Can be null if no camera is set.
 	 * @return
@@ -397,7 +399,7 @@ implements SurfaceHolder.Callback{
 		Parameters params = getParameters();
 		if (params == null)
 			return null;
-		
+
 		return params.getFlashMode();
 	}
 
@@ -415,7 +417,7 @@ implements SurfaceHolder.Callback{
 			flashMode = oldFlashMode;
 		if (flashMode == null)
 			flashMode = Camera.Parameters.FLASH_MODE_AUTO;
-		
+
 		// release the old camera
 		if (mCamera != null){
 			try{
@@ -424,7 +426,7 @@ implements SurfaceHolder.Callback{
 				Log.e("CameraHelper", Log.getStackTraceString(e));
 			}
 		}
-		
+
 		// set new camera
 		mCamera = newCam;	
 
@@ -542,7 +544,7 @@ implements SurfaceHolder.Callback{
 		else
 			return params.getSupportedFlashModes();
 	}
-	
+
 	/**
 	 * Set the surfaceView size to be within the set limits and scaled correctly. Also set the camera and preivew size.
 	 * @param act An activity required to set some various parameters
@@ -609,7 +611,7 @@ implements SurfaceHolder.Callback{
 		// get the preview size that is closest to the image size
 		WidthHeight bestWidthHeightPreivew = null;
 		bestWidthHeightPreivew = 
-				getBestWidthHeight(previewSizes, max, bestWidthHeight);
+			getBestWidthHeight(previewSizes, max, bestWidthHeight);
 		if (bestWidthHeightPreivew == null)
 			throw new CameraHelperException("Could not find a camera preview size.");
 
@@ -632,12 +634,12 @@ implements SurfaceHolder.Callback{
 
 		// actually set the  parameters to camera
 		mCamera.setParameters(params);	
-		
+
 		// start the preview
 		if (!isWaitingForPictureSave && shouldStart)
 			startPreview();
 	}
-	
+
 	/**
 	 * Set the surfaceView size to be within the set limits and scaled correctly. Also set the camera and preivew size.
 	 * @param act An activity required to set some various parameters
@@ -654,7 +656,7 @@ implements SurfaceHolder.Callback{
 			WidthHeight maxWidthHeight,
 			WidthHeight windowSize,
 			boolean switchOrientation)
-					throws Exception {
+	throws Exception {
 
 		// stop the preview
 		stopPreview();
@@ -718,7 +720,7 @@ implements SurfaceHolder.Callback{
 		// get the preview size that is closest to the image size
 		WidthHeight bestWidthHeightPreivew = null;
 		bestWidthHeightPreivew = 
-				getBestWidthHeight(previewSizes, maxWidthHeight, bestWidthHeight);
+			getBestWidthHeight(previewSizes, maxWidthHeight, bestWidthHeight);
 		if (bestWidthHeightPreivew == null)
 			throw new Exception("Could not find a camera preview size.");
 
@@ -759,7 +761,7 @@ implements SurfaceHolder.Callback{
 
 		// stop the preview
 		stopPreview();
-		
+
 		Camera.Parameters cameraParameters = getParameters();
 
 		// get possible preview sizes and image sizes
@@ -804,7 +806,7 @@ implements SurfaceHolder.Callback{
 		// get the preview size that is closest to the image size
 		WidthHeight bestWidthHeightPreivew = null;
 		bestWidthHeightPreivew = 
-				getBestWidthHeight(previewSizes, maxWidthHeight, bestWidthHeight);
+			getBestWidthHeight(previewSizes, maxWidthHeight, bestWidthHeight);
 		if (bestWidthHeightPreivew == null)
 			throw new Exception("Could not find a camera preview size.");
 
@@ -878,7 +880,7 @@ implements SurfaceHolder.Callback{
 	public boolean isPreviewRunning(){
 		return isPreviewRunning;
 	}
-	
+
 	public static abstract class OnRotationCallback{	
 		/**
 		 * Called when the orientation changes. Angles are 0, 90, 180, 270
@@ -893,7 +895,7 @@ implements SurfaceHolder.Callback{
 			int height) {
 		if (!isSurfaceInitialized)
 			return;
-		
+
 		try{
 			// reset the size
 			setSurfaceSizePreviewSizeCameraSize(act, new WidthHeight(width, height));
@@ -927,7 +929,7 @@ implements SurfaceHolder.Callback{
 		isSurfaceInitialized = false;
 		isSurfaceCreated = false;
 	}
-	
+
 	/**
 	 * Are we currently waiting for the picture to be saved?
 	 * @return
@@ -935,11 +937,11 @@ implements SurfaceHolder.Callback{
 	public boolean isWaitingForPictureSave(){
 		return isWaitingForPictureSave;
 	}
-	
+
 	public void setIsWaitingForPictureSave(boolean isWaitingForPictureSave){
 		this.isWaitingForPictureSave = isWaitingForPictureSave;
 	}
-	
+
 	public void setTryingToTakePicture(boolean isTryingToTakePicture) {
 		this.isTryingToTakePicture = isTryingToTakePicture;
 	}
@@ -947,7 +949,7 @@ implements SurfaceHolder.Callback{
 	public boolean isTryingToTakePicture() {
 		return isTryingToTakePicture;
 	}
-	
+
 	public Camera getCamera(){
 		return mCamera;
 	}
@@ -958,6 +960,22 @@ implements SurfaceHolder.Callback{
 
 	public boolean isFocused() {
 		return isFocused;
+	}
+
+	/**
+	 * Take a picture, but catches exceptions and runs exceptionCaught
+	 * @param shutter The shutter callback to call
+	 * @param raw The raw callback to call
+	 * @param jpeg The jpeg callback to call
+	 */
+	public void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback jpeg){
+		try{
+			getCamera().takePicture(shutter, raw, jpeg);
+		}catch(RuntimeException e){
+			Log.e("CameraHelper", Log.getStackTraceString(e));
+			if (exceptionCaught != null)
+				exceptionCaught.onExceptionCaught(e);
+		}
 	}
 
 	public interface ExceptionCaught{
