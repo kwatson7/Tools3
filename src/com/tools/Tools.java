@@ -34,6 +34,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -48,16 +49,21 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Environment;
+import android.os.StatFs;
 import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
 import android.telephony.SmsManager;
 import android.telephony.TelephonyManager;
 import android.text.Html;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -1419,5 +1425,154 @@ public class Tools {
 	            destination.close();
 	        }
 	    }
+	}
+	
+	/**
+	 * Attempt to find the path to the external ad card. Will return null if none found.
+	 * Not guaranteed to find the path or that the returned path is indeed the external sd_card, as 
+	 * there is currently no public api for such a command
+	 * @return The external sd card
+	 */
+	public static File getExternalSdCardPath(){
+		// strings to look for
+		String[] keywords = {"external_sd", "external", "extern_sd"};//, "sd"};
+		
+		// base path
+		File topPath = Environment.getExternalStorageDirectory();
+		
+		// null
+		if (topPath == null || topPath.getAbsolutePath().length() == 0)
+			return null;
+
+		// grab list of files looking for external
+		File[] files = topPath.listFiles();
+		if(files!=null) { //some JVMs return null for empty dirs
+			
+			// check over various keywords
+			for (String keyword : keywords){
+				// loop over all files
+				for(File f: files) {
+					if (f.isDirectory() && f.getName().contains(keyword)){
+						return f;
+					}
+				}
+			}
+		}
+		
+		// if we made it here, there must have been no matching file
+		return null;
+	}
+	
+	/**
+	 * Attempt to determine to mirrored path from the input file path to the external sd_card.
+	 * Will return null if none found.
+	 * Not guaranteed to find the path or that the returned path is indeed the external sd_card, as 
+	 * there is currently no public api for such a command </p>
+	 * For example </p>
+	 * getMirroredExternalPath("/mnt/sdcard/yourFolder/yourFile.jpg")
+	 * could return "/mnt/sdcard/external_sd/yourFolder/yourFile.jpg"
+	 * @param originalPath the path we are starting with and we are goign to mirrow
+	 * @return The external sd card path
+	 */
+	public static String getMirroredExternalPath(String originalPath){
+		
+		// base path
+		File topPath = Environment.getExternalStorageDirectory();
+		
+		// the external path
+		File external = getExternalSdCardPath();
+		
+		// null
+		if (external == null || topPath == null ||
+				topPath.getAbsolutePath().length() == 0 ||
+				external.getAbsolutePath().length() == 0)
+			return null;
+		
+		// replace the string
+		String output = new String(originalPath);
+		if (output.contains(topPath.getAbsolutePath()) && !output.contains(external.getAbsolutePath()))
+			output = output.replace(topPath.getAbsolutePath(), external.getAbsolutePath());
+		else
+			output = null;
+
+		return output;
+	}
+	
+	/**
+	 * @param path the path we wish to analyze
+	 * @return Number of bytes available at given location
+	 */
+	public static long getAvailableSpace(String path) {
+	    long availableSpace = -1L;
+	    StatFs stat = new StatFs(path);
+	    availableSpace = (long) stat.getAvailableBlocks() * (long) stat.getBlockSize();
+
+	    return availableSpace;
+	}
+	
+	/**
+	 * Convert units of dp (device independent pixels) to normal pixels based on the screen
+	 * @param ctx Required context to convert
+	 * @param dp the number of dp
+	 * @return the pixels
+	 */
+	public static float convertDpToPix(Context ctx, int dp){
+		Resources r = ctx.getResources();
+		return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, r.getDisplayMetrics());
+	}
+	
+	/**
+	 * Convert units of pixles to dp (device independent pixels) based on the screen
+	 * @param act required activity to convert
+	 * @param pix the number of pixels
+	 * @return the dp
+	 */
+	public static float convertPixToDp(Activity act, int dp){
+		DisplayMetrics metrics = new DisplayMetrics();
+		act.getWindowManager().getDefaultDisplay().getMetrics(metrics);
+		float logicalDensity = metrics.density;
+		return dp * logicalDensity;
+	}
+	
+	/**
+	 * Set a grid view to have no spacing between items and fully fill desired width. Also make selector on top. Otherwise we couldn't see
+	 * the selection as it would be behind item.
+	 * @param act the activity this is called in
+	 * @param desiredGridItemWidth The desired width of the grid item
+	 * @param gridView The gridview to act on
+	 * @param desiredGridViewWidth The desired width of the full gridview (if useFullScreen is true, this is ignored)
+	 * @param useFullScreen Should we fill the whole screen or use desiredGridViewWidth
+	 * @return the size of the grid item
+	 */
+	public static int setGridViewColsBasedOnScreen(
+			Activity act,
+			int desiredGridItemWidth,
+			GridView gridView,
+			int desiredGridViewWidth,
+			boolean useFullScreen){
+		
+		// the grid item width in pixels
+		float desiredPicWidthPx = com.tools.Tools.convertDpToPix(act, desiredGridItemWidth); // in px
+		
+		// the screen width in pixels
+		if (useFullScreen){
+			Display display = act.getWindowManager().getDefaultDisplay(); 
+			desiredGridViewWidth = display.getWidth();
+		}
+		
+		// how many items can we fit
+		int nPics = Math.round(desiredGridViewWidth/desiredPicWidthPx);
+		if (nPics <= 0) // make sure at least 1 pictures
+			nPics = 1;
+		
+		// actual width 
+		int actualPicWidth = (int) Math.floor(desiredGridViewWidth/nPics);
+		
+		// set the width and number of items.
+		gridView.setColumnWidth(actualPicWidth);
+		gridView.setNumColumns(nPics);
+		gridView.setDrawSelectorOnTop(true);
+		
+		return actualPicWidth;
 	}
 }

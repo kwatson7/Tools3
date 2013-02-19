@@ -1,6 +1,10 @@
 package com.tools.images;
 
+import java.io.IOException;
+
 import android.content.Context;
+import android.graphics.BitmapFactory;
+import android.graphics.BitmapRegionDecoder;
 import android.graphics.PointF;
 import android.os.SystemClock;
 import android.util.AttributeSet;
@@ -14,7 +18,9 @@ import android.widget.ImageView;
 public class CustomGallery
 extends Gallery{
 
+	private static final long SCROLL_TIME_THRESHOLD = 250l;
 	private int pictureId = -1;
+	
 	
 	public CustomGallery(Context context, AttributeSet attrs, int defStyle)
 	{
@@ -72,6 +78,33 @@ extends Gallery{
 
 		return false;
 	}
+	
+	@Override
+	public boolean onKeyDown(int code, KeyEvent event){
+		if (event != null){
+			int pos = getSelectedItemPosition();
+			if (pos == Gallery.INVALID_POSITION)
+				pos = getFirstVisiblePosition();
+			if (pos == Gallery.INVALID_POSITION)
+				return super.onKeyDown(code, event);
+
+			switch(code){
+			case KeyEvent.KEYCODE_DPAD_LEFT:
+				if (pos > 0){
+					setSelection(pos-1);
+					return true;
+				}
+	
+			case KeyEvent.KEYCODE_DPAD_RIGHT:
+				if (pos < this.getAdapter().getCount()-1){
+					setSelection(pos+1);
+					return true;
+				}
+			}
+		}
+
+		return super.onKeyDown(code, event);
+	}
 
 	private boolean isScrollingLeft(MotionEvent e1, MotionEvent e2){
 		return e2.getX() > e1.getX();
@@ -91,7 +124,7 @@ extends Gallery{
 		// that'll ignore the per-second layout calls we get through BooPlayerView's
 		// updating.
 		long now = SystemClock.uptimeMillis();
-		if (Math.abs(now - mLastScrollEvent) > 250) {
+		if (Math.abs(now - mLastScrollEvent) > SCROLL_TIME_THRESHOLD) {
 			super.onLayout(changed, l, t, r, b);
 		}
 	}
@@ -117,12 +150,20 @@ extends Gallery{
 	
 	private boolean didWeTouchGallery = false;
 	private boolean didWeScrollGallery = false;
+	private boolean didWeMultiTouch = false;
 	@Override
 	public boolean onInterceptTouchEvent( MotionEvent ev ) {
 
 	    ImageViewTouch image = getImageViewTouch();
 
-	    if (image==null || !image.isDraggable() ) {
+	    // keep track if we are multi touch - required on some phones
+	    if (ev.getActionIndex() > 0){
+	    	didWeMultiTouch = true;
+	    }
+	    if (ev.getAction() == MotionEvent.ACTION_CANCEL || ev.getAction() == MotionEvent.ACTION_UP)
+	    	didWeMultiTouch = false;
+	    
+	    if (image==null || !image.isDraggable() && !didWeMultiTouch) {
 	        onTouchEvent( ev );
 	    }
 	    

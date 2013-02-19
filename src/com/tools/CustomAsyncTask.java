@@ -108,6 +108,16 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 		detachAll();
 	}
 	
+	@Override
+	protected void onCancelled() {
+		
+		// close the attached dialog
+		hideDialog();
+		
+		// detach from calling context to free the link
+		detachAll();
+	}
+	
 	/**
 	 * This should be overriden in place of onPostExecute. This is called inside onPostExecute, and then after detachAll() is called.
 	 * @param result
@@ -134,9 +144,9 @@ public abstract class CustomAsyncTask <ACTIVITY_TYPE extends CustomActivity, PRO
 		if (dialog != null)
 			progress = dialog.getProgress();
 		setupDialog();
+		showDialog();
 		if (dialog != null)
 			dialog.setProgress(progress);
-		showDialog();
 	}
 	
 	/**

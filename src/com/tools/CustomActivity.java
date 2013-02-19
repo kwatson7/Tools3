@@ -1,6 +1,7 @@
 package com.tools;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import android.app.Activity;
 import android.app.Dialog;
@@ -71,18 +72,25 @@ extends Activity{
 		if (configurationProperties != null){
 			ArrayList<CustomAsyncTask> array = configurationProperties.asyncArrayConfig;
 			if (array != null){
+				ArrayList<Integer> toRemove = new ArrayList<Integer>();
 				for (int i = 0; i < array.size(); i++){
 					CustomAsyncTask task = array.get(i);
 					if (task != null){
-						if (task.isFinished()){
+						if (task.isFinished() || task.isCancelled()){
 							task.detach();
 							task = null;
-							array.remove(i);
+							toRemove.add(i);
 						}else
 							task.attach(this);
 					}else
-						array.remove(i);
+						toRemove.add(i);
 				}
+				
+				// remove list
+				Collections.sort(toRemove, Collections.reverseOrder());
+				for (int i : toRemove)
+				    array.remove(i);
+					
 			}
 			asyncArray = array;
 		}
