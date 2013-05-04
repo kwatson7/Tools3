@@ -30,7 +30,8 @@ implements SurfaceHolder.Callback{
 
 	// constants
 	private static int PIXEL_FORMAT = PixelFormat.RGB_565; 							// pixel format of preview
-
+	private static String TAG = "com.captainHaddock.CameraHelper";
+	
 	// private member variables
 	private OrientationEventListener mOrientationEventListener; 					// The listener to call when orientation changes
 	private Orientation mOrientation = Orientation.ORIENTATION_LANDSCAPE_NORMAL;	// The current orientation of the camera
@@ -173,7 +174,7 @@ implements SurfaceHolder.Callback{
 		try {
 			setSurfaceSizePreviewSizeCameraSize(act, windowToFitSurface);
 		} catch (CameraHelperException e) {
-			Log.e("CameraHelper", Log.getStackTraceString(e));
+			Log.e(TAG, Log.getStackTraceString(e));
 			if (exceptionCaught != null)
 				exceptionCaught.onExceptionCaught(e);
 			return;
@@ -224,7 +225,7 @@ implements SurfaceHolder.Callback{
 
 		// no camera
 		if (camera == null){
-			Log.e("CameraHelper", "no accessible front facing camera");
+			Log.e(TAG, "no accessible front facing camera");
 			if (exceptionCaught != null)
 				exceptionCaught.onExceptionCaught(new CameraHelperException("no accessible front facing camera"));
 		}
@@ -266,7 +267,7 @@ implements SurfaceHolder.Callback{
 
 		// no camera
 		if (camera == null){
-			Log.e("CameraHelper", "no accessible front facing camera");
+			Log.e(TAG, "no accessible front facing camera");
 			if (exceptionCaught != null)
 				exceptionCaught.onExceptionCaught(new CameraHelperException("no accessible back facing camera"));
 		}
@@ -423,7 +424,7 @@ implements SurfaceHolder.Callback{
 			try{
 				mCamera.release();
 			}catch(Exception e){
-				Log.e("CameraHelper", Log.getStackTraceString(e));
+				Log.e(TAG, Log.getStackTraceString(e));
 			}
 		}
 
@@ -439,7 +440,7 @@ implements SurfaceHolder.Callback{
 			try {
 				mCamera.setPreviewDisplay(surfaceHolder);
 			} catch (IOException e) {
-				Log.e("CameraHelper", Log.getStackTraceString(e));
+				Log.e(TAG, Log.getStackTraceString(e));
 				if (exceptionCaught != null)
 					exceptionCaught.onExceptionCaught(e);
 			} 
@@ -900,7 +901,7 @@ implements SurfaceHolder.Callback{
 			// reset the size
 			setSurfaceSizePreviewSizeCameraSize(act, new WidthHeight(width, height));
 		}catch(CameraHelperException e1){
-			Log.e("CameraHelper", Log.getStackTraceString(e1));
+			Log.e(TAG, Log.getStackTraceString(e1));
 			if (exceptionCaught != null)
 				exceptionCaught.onExceptionCaught(e1);
 		}
@@ -909,7 +910,7 @@ implements SurfaceHolder.Callback{
 	@Override
 	public void surfaceCreated(SurfaceHolder holder) {
 		if (holder != surfaceHolder){
-			Log.e("CameraHelper", "surfaceHolders were not equal, we don't expect this to happen");
+			Log.e(TAG, "surfaceHolders were not equal, we don't expect this to happen");
 			surfaceHolder = holder;
 		}
 		try {
@@ -918,7 +919,7 @@ implements SurfaceHolder.Callback{
 				isSurfaceCreated = true;
 			}
 		} catch (IOException e) {
-			Log.e("CameraHelper", Log.getStackTraceString(e));
+			Log.e(TAG, Log.getStackTraceString(e));
 			if (exceptionCaught != null)
 				exceptionCaught.onExceptionCaught(e);
 		} 
@@ -972,7 +973,7 @@ implements SurfaceHolder.Callback{
 		try{
 			getCamera().takePicture(shutter, raw, jpeg);
 		}catch(RuntimeException e){
-			Log.e("CameraHelper", Log.getStackTraceString(e));
+			Log.e(TAG, Log.getStackTraceString(e));
 			if (exceptionCaught != null)
 				exceptionCaught.onExceptionCaught(e);
 		}

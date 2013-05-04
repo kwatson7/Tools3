@@ -12,13 +12,22 @@ import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.channels.FileChannel;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.codec.EncoderException;
+
+import com.tools.encryption.EncryptionException;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -46,6 +55,7 @@ import android.media.ExifInterface;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Environment;
@@ -1574,5 +1584,92 @@ public class Tools {
 		gridView.setDrawSelectorOnTop(true);
 		
 		return actualPicWidth;
+	}
+	
+	/**
+	 * Return the device manufacturer and model
+	 * @return
+	 */
+	public static String getDeviceName() {
+		String manufacturer = Build.MANUFACTURER;
+		String model = Build.MODEL;
+		if (model.startsWith(manufacturer)) {
+			return capitalize(model);
+		} else {
+			return capitalize(manufacturer) + " " + model;
+		}
+	}
+
+	/**
+	 * Captialize the given string
+	 * @param s
+	 * @return
+	 */
+	public static String capitalize(String s) {
+		if (s == null || s.length() == 0) {
+			return "";
+		}
+		char first = s.charAt(0);
+		if (Character.isUpperCase(first)) {
+			return s;
+		} else {
+			return Character.toUpperCase(first) + s.substring(1);
+		}
+	} 
+	
+	/**
+	 * Some devices, the camera must be reset after changing flash mode 
+	 * for it to stick. This will return true if we are on one of those devices.
+	 * @return
+	 */
+	public static boolean isDeviceThatRequiresNewCameraOnFlashChange(){
+		HashSet<String> badDevices = new HashSet<String>(1);
+		badDevices.add("Samsung SGH-T769");
+		
+		String thisDevice = getDeviceName();
+		if (badDevices.contains(thisDevice))
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * Calculate md5 checksum of a file
+	 * @param fileName the name of the file
+	 * @return the checksum
+	 * @throws IOException
+	 * @throws EncryptionException 
+	 */
+	public static byte[] md5CheckSumFile(String fileName) throws IOException, EncryptionException{
+		MessageDigest md;
+		try {
+			md = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			throw new EncryptionException(e);
+		}
+		InputStream is = new FileInputStream(fileName);
+		try {
+			is = new DigestInputStream(is, md);
+			// read stream to EOF as normal...
+		}
+		finally {
+			is.close();
+		}
+		byte[] digest = md.digest();
+		return digest;
+	}
+	
+	/**
+	 * Calculate the md5 checksum of two files and compare them
+	 * @param fileName1 first file
+	 * @param fileName2 second file
+	 * @return true if their md5 checksums are equal
+	 * @throws IOException 
+	 * @throws EncryptionException 
+	 */
+	public static boolean isFileEqual(String fileName1, String fileName2) throws IOException, EncryptionException{
+		byte[] a = md5CheckSumFile(fileName1);
+		byte[] b = md5CheckSumFile(fileName2);
+		return Arrays.equals(a, b);
 	}
 }
