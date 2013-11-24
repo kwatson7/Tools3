@@ -1,8 +1,11 @@
 package com.tools.images;
 
 
+import java.io.IOException;
+
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapRegionDecoder;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;

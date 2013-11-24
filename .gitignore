@@ -1,3 +1,4 @@
 *.class
-tools.jar
 */drawable*/*Thumbs.db
+Tools.jar
+bin/

@@ -12,13 +12,22 @@ import java.lang.ref.WeakReference;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.channels.FileChannel;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.codec.EncoderException;
+
+import com.tools.encryption.EncryptionException;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -34,6 +43,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -45,19 +55,25 @@ import android.media.ExifInterface;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Environment;
+import android.os.StatFs;
 import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
 import android.telephony.SmsManager;
 import android.telephony.TelephonyManager;
 import android.text.Html;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -85,6 +101,7 @@ public class Tools {
 	public static final int BUFFER_SIZE = 1024;
 
 	private static final String LOG_TAG = "Tools";
+	private static final char[] ILLEGAL_CHARACTERS = { '/', '\n', '\r', '\t', '\0', '\f', '`', '?', '*', '\\', '<', '>', '|', '\"', ':'};
 
 	/**
 	 * Get a filename from a given uri
@@ -622,6 +639,136 @@ public class Tools {
 				output += new BigDecimal(seconds).stripTrailingZeros().toPlainString()  + " seconds, ";
 		}
 
+		// return the string minus the last comma and space
+		if (output.length() >= 2)
+			return output.substring(0, output.length()-2);		
+		else
+			return output;
+	}
+	
+	/**
+	 * Take in an amount of milliseconds and convert it to a human readable output.
+	 * For example, if minutes=384, then the output will be:
+	 * "6 hours and 24 minutes".
+	 * <p></p>
+	 * The allowable outputs are years (365 days), weeks, days, hours, minutes, seconds
+	 * <p></p>
+	 * If milliseconds is 70000 and minFractionToShowNextCategory is 0.25, that means we
+	 * currently have 70 seconds to display, which will format to 1 minute and 10 seconds... however
+	 * since the last category (10 seconds) only adds 1/6th or 0.16 extra information to 1 minute
+	 * and the min threshold input is 0.25 only "1 minute" will be displayed. The input time
+	 * would have to be 75000 before the (now 15 seconds) would be displayed 
+	 * @param milliseconds the milliseconds to convert
+	 * @param minFractionToShowNextCategory Minimum amount of extra info needed to show next category.
+	 * @return the human readable string
+	 */
+	public static String convertMillisecondsToFormattedString(double milliseconds, double minFractionToShowNextCategory){
+
+		// if 0 then return 0 seconds
+		if (milliseconds == 0)
+			return "0 seconds";
+
+		// the output string
+		String output = "";
+		
+		// if negative then change string
+		if (milliseconds < 0){
+			milliseconds = -milliseconds;
+			output = "- ";
+		}
+
+		// convert milliseconds to minutes
+		double minutes = milliseconds/60000;
+		
+		// keep track of base amount to know when to stop adding new info
+		double baseMinutes = 0;
+		
+		// find how many years
+		int years = (int) Math.floor(minutes/(365*60*24));
+		if (years > 0){
+			if (years == 1)
+				output = years + " year, ";
+			else
+				output = years + " years, ";
+			baseMinutes = (years*365*60*24);
+			minutes = minutes - baseMinutes;
+		}
+
+		// how many weeks
+		int weeks = (int) Math.floor(minutes/(60*24*7));
+		if (weeks > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (weeks == 1)
+				output += weeks + " week, ";
+			else
+				output += weeks + " weeks, ";
+			minutes = minutes - (weeks*60*24*7);
+			if (baseMinutes == 0)
+				baseMinutes = weeks*60*24*7;
+		}
+
+		// how many days
+		int days = (int) Math.floor(minutes/(60*24));
+		if (days > 0  && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (days == 1)
+				output += days + " day, ";
+			else
+				output += days + " days, ";
+			minutes = minutes - (days*60*24);
+			if (baseMinutes == 0)
+				baseMinutes = days*60*24;
+		}
+
+		// how many hours
+		int hours = (int) Math.floor(minutes/(60));
+		if (hours > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (hours == 1)
+				output += hours + " hour, ";
+			else
+				output += hours + " hours, ";
+			minutes = minutes - (hours*60);
+			if (baseMinutes == 0)
+				baseMinutes = hours*60;
+		}
+
+		// how many minutes
+		int minutesDisp = (int) Math.floor(minutes);
+		if (minutesDisp > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (minutesDisp == 1)
+				output += minutesDisp + " minute, ";
+			else
+				output += minutesDisp + " minutes, ";
+			minutes = minutes - (minutesDisp);
+			if (baseMinutes == 0)
+				baseMinutes = minutesDisp;
+		}
+
+		// how many seconds
+		double seconds =  minutes*60.0;
+		if (seconds > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			// then only go out to decimal that still meets minFraction
+			double secondsToDisplay = 0;
+			int maxDecimal = -1;
+			for (int decimal = -1; decimal < 6; decimal++){
+				if (baseMinutes != 0){
+					if (Math.abs(seconds-secondsToDisplay) > baseMinutes*minFractionToShowNextCategory){
+						secondsToDisplay += com.tools.MathTools.round(seconds-secondsToDisplay, decimal);
+						maxDecimal = decimal;
+					}
+				}else{
+					secondsToDisplay += com.tools.MathTools.round(seconds-secondsToDisplay, decimal);
+					baseMinutes = secondsToDisplay/60;
+					maxDecimal = decimal;
+				}
+			}
+
+			if (secondsToDisplay == 1)
+				output += new BigDecimal(secondsToDisplay).setScale(
+						maxDecimal, BigDecimal.ROUND_HALF_UP).toPlainString() + " second, ";
+			else
+				output += new BigDecimal(secondsToDisplay).setScale(
+						maxDecimal, BigDecimal.ROUND_HALF_UP).toPlainString()  + " seconds, ";
+		}
+		
 		// return the string minus the last comma and space
 		if (output.length() >= 2)
 			return output.substring(0, output.length()-2);		
@@ -1370,7 +1517,7 @@ public class Tools {
 			// failsafe toast
 			if (ctx != null){
 				try{
-					Toast.makeText(ctx, message, Toast.LENGTH_LONG);
+					Toast.makeText(ctx, message, Toast.LENGTH_LONG).show();
 				}catch(Exception e2){
 					Log.e(LOG_TAG, Log.getStackTraceString(e2));
 				}
@@ -1419,5 +1566,296 @@ public class Tools {
 	            destination.close();
 	        }
 	    }
+	}
+	
+	/**
+	 * Attempt to find the path to the external ad card. Will return null if none found.
+	 * Not guaranteed to find the path or that the returned path is indeed the external sd_card, as 
+	 * there is currently no public api for such a command
+	 * @return The external sd card
+	 */
+	public static File getExternalSdCardPath(){
+		// strings to look for
+		String[] keywords = {"external_sd", "external", "extern_sd"};//, "sd"};
+		
+		// base path
+		File topPath = Environment.getExternalStorageDirectory();
+		
+		// null
+		if (topPath == null || topPath.getAbsolutePath().length() == 0)
+			return null;
+
+		// grab list of files looking for external
+		File[] files = topPath.listFiles();
+		if(files!=null) { //some JVMs return null for empty dirs
+			
+			// check over various keywords
+			for (String keyword : keywords){
+				// loop over all files
+				for(File f: files) {
+					if (f.isDirectory() && f.getName().contains(keyword)){
+						return f;
+					}
+				}
+			}
+		}
+		
+		// if we made it here, there must have been no matching file
+		return null;
+	}
+	
+	/**
+	 * Attempt to determine to mirrored path from the input file path to the external sd_card.
+	 * Will return null if none found.
+	 * Not guaranteed to find the path or that the returned path is indeed the external sd_card, as 
+	 * there is currently no public api for such a command </p>
+	 * For example </p>
+	 * getMirroredExternalPath("/mnt/sdcard/yourFolder/yourFile.jpg")
+	 * could return "/mnt/sdcard/external_sd/yourFolder/yourFile.jpg"
+	 * @param originalPath the path we are starting with and we are goign to mirrow
+	 * @return The external sd card path
+	 */
+	public static String getMirroredExternalPath(String originalPath){
+		
+		// base path
+		File topPath = Environment.getExternalStorageDirectory();
+		
+		// the external path
+		File external = getExternalSdCardPath();
+		
+		// null
+		if (external == null || topPath == null ||
+				topPath.getAbsolutePath().length() == 0 ||
+				external.getAbsolutePath().length() == 0)
+			return null;
+		
+		// replace the string
+		String output = new String(originalPath);
+		if (output.contains(topPath.getAbsolutePath()) && !output.contains(external.getAbsolutePath()))
+			output = output.replace(topPath.getAbsolutePath(), external.getAbsolutePath());
+		else
+			output = null;
+
+		return output;
+	}
+	
+	/**
+	 * @param path the path we wish to analyze
+	 * @return Number of bytes available at given location
+	 */
+	public static long getAvailableSpace(String path) {
+	    long availableSpace = -1L;
+	    StatFs stat = new StatFs(path);
+	    availableSpace = (long) stat.getAvailableBlocks() * (long) stat.getBlockSize();
+
+	    return availableSpace;
+	}
+	
+	/**
+	 * Convert units of dp (device independent pixels) to normal pixels based on the screen
+	 * @param ctx Required context to convert
+	 * @param dp the number of dp
+	 * @return the pixels
+	 */
+	public static float convertDpToPix(Context ctx, int dp){
+		Resources r = ctx.getResources();
+		return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, r.getDisplayMetrics());
+	}
+	
+	/**
+	 * Convert units of pixles to dp (device independent pixels) based on the screen
+	 * @param act required activity to convert
+	 * @param pix the number of pixels
+	 * @return the dp
+	 */
+	public static float convertPixToDp(Activity act, int dp){
+		DisplayMetrics metrics = new DisplayMetrics();
+		act.getWindowManager().getDefaultDisplay().getMetrics(metrics);
+		float logicalDensity = metrics.density;
+		return dp * logicalDensity;
+	}
+	
+	/**
+	 * Set a grid view to have no spacing between items and fully fill desired width. Also make selector on top. Otherwise we couldn't see
+	 * the selection as it would be behind item.
+	 * @param act the activity this is called in
+	 * @param desiredGridItemWidth The desired width of the grid item
+	 * @param gridView The gridview to act on
+	 * @param desiredGridViewWidth The desired width of the full gridview (if useFullScreen is true, this is ignored)
+	 * @param useFullScreen Should we fill the whole screen or use desiredGridViewWidth
+	 * @return the size of the grid item
+	 */
+	public static int setGridViewColsBasedOnScreen(
+			Activity act,
+			int desiredGridItemWidth,
+			GridView gridView,
+			int desiredGridViewWidth,
+			boolean useFullScreen){
+		
+		// the grid item width in pixels
+		float desiredPicWidthPx = com.tools.Tools.convertDpToPix(act, desiredGridItemWidth); // in px
+		
+		// the screen width in pixels
+		if (useFullScreen){
+			Display display = act.getWindowManager().getDefaultDisplay(); 
+			desiredGridViewWidth = display.getWidth();
+		}
+		
+		// how many items can we fit
+		int nPics = Math.round(desiredGridViewWidth/desiredPicWidthPx);
+		if (nPics <= 0) // make sure at least 1 pictures
+			nPics = 1;
+		
+		// actual width 
+		int actualPicWidth = (int) Math.floor(desiredGridViewWidth/nPics);
+		
+		// set the width and number of items.
+		gridView.setColumnWidth(actualPicWidth);
+		gridView.setNumColumns(nPics);
+		gridView.setDrawSelectorOnTop(true);
+		
+		return actualPicWidth;
+	}
+	
+	/**
+	 * Get the time required to read for a toast message, based on number of words. Maxes out at 10 seconds
+	 * @param message The message to parse
+	 * @return Time in milliseconds to show toast
+	 */
+	public static long getTimeToReadForToast(String message){
+		// some constants for timeing
+		final double wordsPerSecond = 3.3;
+		final double maxTime = 10;
+		final double initialTime = 1.5;
+		
+		// count the words
+		String trim = message.trim();
+		if (trim.isEmpty()) return 0;
+		int nWords = trim.split("\\s+").length; //separate string around spaces
+		
+		// convert to time
+		double time = nWords/wordsPerSecond + initialTime;
+		if (time > maxTime)
+			time = maxTime;
+		
+		return (long) (time*1000);
+	}
+	
+	/**
+	 * Return the device manufacturer and model
+	 * @return
+	 */
+	public static String getDeviceName() {
+		String manufacturer = Build.MANUFACTURER;
+		String model = Build.MODEL;
+		if (model.startsWith(manufacturer)) {
+			return capitalize(model);
+		} else {
+			return capitalize(manufacturer) + " " + model;
+		}
+	}
+
+	/**
+	 * Captialize the given string
+	 * @param s
+	 * @return
+	 */
+	public static String capitalize(String s) {
+		if (s == null || s.length() == 0) {
+			return "";
+		}
+		char first = s.charAt(0);
+		if (Character.isUpperCase(first)) {
+			return s;
+		} else {
+			return Character.toUpperCase(first) + s.substring(1);
+		}
+	} 
+	
+	/**
+	 * Some devices, the camera must be reset after changing flash mode 
+	 * for it to stick. This will return true if we are on one of those devices.
+	 * @return
+	 */
+	public static boolean isDeviceThatRequiresNewCameraOnFlashChange(){
+		HashSet<String> badDevices = new HashSet<String>(1);
+		badDevices.add("Samsung SGH-T769");
+		
+		String thisDevice = getDeviceName();
+		if (badDevices.contains(thisDevice))
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * Calculate md5 checksum of a file
+	 * @param fileName the name of the file
+	 * @return the checksum
+	 * @throws IOException
+	 * @throws EncryptionException 
+	 */
+	public static byte[] md5CheckSumFile(String fileName) throws IOException, EncryptionException{
+		MessageDigest md;
+		try {
+			md = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			throw new EncryptionException(e);
+		}
+		InputStream is = new FileInputStream(fileName);
+		try {
+			is = new DigestInputStream(is, md);
+			// read stream to EOF as normal...
+		}
+		finally {
+			is.close();
+		}
+		byte[] digest = md.digest();
+		return digest;
+	}
+	
+	/**
+	 * Calculate the md5 checksum of two files and compare them
+	 * @param fileName1 first file
+	 * @param fileName2 second file
+	 * @return true if their md5 checksums are equal
+	 * @throws IOException 
+	 * @throws EncryptionException 
+	 */
+	public static boolean isFileEqual(String fileName1, String fileName2) throws IOException, EncryptionException{
+		byte[] a = md5CheckSumFile(fileName1);
+		byte[] b = md5CheckSumFile(fileName2);
+		return Arrays.equals(a, b);
+	}
+	
+	/**
+	 * takes a name and returns an allowable file/directory name. It replaces all non acceptable characters
+	 * with _. ie file:name returns file_name
+	 * @param name input name
+	 * @return The acceptible file name
+	 */
+	public static String getAllowableFileName(String name){
+
+		String out = name;
+		for (int i = 0; i < ILLEGAL_CHARACTERS.length; i++)
+			out = out.replace(ILLEGAL_CHARACTERS[i], '_');
+
+		return out.trim();
+	}
+	
+
+	/**
+	 * Make the string plural if number is != 1. For example if number is 2, and noun is cat, then "2 cats" will be the output
+	 * @param number the number
+	 * @param noun the noun to convert
+	 * @return The number with the noun
+	 */
+	public static String pluralString(double number, String noun){
+		String out;
+		if (number== 1)
+			out = number+" "+ noun;
+		else
+			out = number+" "+ noun+"s";
+		return out;
 	}
 }
