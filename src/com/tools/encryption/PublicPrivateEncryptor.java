@@ -10,12 +10,15 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.spec.EncodedKeySpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
+
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -49,6 +52,78 @@ public class PublicPrivateEncryptor {
 		this.publicKey = publicKey;
 		cipherStorePublic = new CipherStore(publicKey, ALGORITHM_RSA_ENCRYPTION);
 		cipherStorePrivate = new CipherStore(privateKey, ALGORITHM_RSA_ENCRYPTION);
+	}
+	
+	/**
+	 * Create an encryption object from base64 encoded keys. They keys can be null, but then will get null pointer exceptions if
+	 * methods are later called that would require said data
+	 * @param privateKeyBase64 private key encoded as base64
+	 * @param publicKeyBase64 public key encoded as base64
+	 * @throws EncryptionException
+	 */
+	public PublicPrivateEncryptor(String privateKeyBase64, String publicKeyBase64) throws EncryptionException{
+		// create the key factory
+		KeyFactory factory;
+		try {
+			factory = KeyFactory.getInstance(ALGORITHM_KEY_FACTORY);
+		} catch (NoSuchAlgorithmException e) {
+			throw new EncryptionException(e);
+		}
+		
+		// decode private key as base64
+		if (privateKeyBase64 != null){
+			EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(Base64.decode(privateKeyBase64, Base64.DEFAULT));
+			try {
+				privateKey = factory.generatePrivate(privateKeySpec);
+			} catch (InvalidKeySpecException e) {
+				throw new EncryptionException(e);
+			}
+		}
+		
+		// decode public key as base64
+		if (publicKeyBase64 != null){
+			EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(Base64.decode(publicKeyBase64, Base64.DEFAULT));
+			try {
+				publicKey = factory.generatePublic(publicKeySpec);
+			} catch (InvalidKeySpecException e) {
+				throw new EncryptionException(e);
+			}
+		}
+	}
+	
+	/**
+	 * Append a new NOnce to the the original byte array
+	 * @param original The original byte array
+	 * @param nBytesNOnce the number of bytes to append to the original byte array
+	 * @return The new byte array
+	 */
+	public static byte[] appendNOnceToByteArray(byte[] original, int nBytesNOnce){
+		// append nBytesNOnce to bytes
+		SecureRandom random = new SecureRandom();
+		byte[] nOnce = new byte[nBytesNOnce];
+		random.nextBytes(nOnce);
+		byte[] both = new byte[original.length + nOnce.length];
+		System.arraycopy(original, 0, both, 0, original.length);
+		System.arraycopy(nOnce, 0, both, original.length, nOnce.length);
+		return both;
+	}
+	
+	/**
+	 * Append a new NOnce to the the original string
+	 * @param original The original string
+	 * @param nBytesNOnce the number of bytes to append to the original byte array
+	 * @return The new byte array
+	 */
+	public static byte[] appendNOnceToString(String originalString, int nBytesNOnce){
+		// append nBytesNOnce to bytes
+		SecureRandom random = new SecureRandom();
+		byte[] nOnce = new byte[nBytesNOnce];
+		random.nextBytes(nOnce);
+		byte[] original = originalString.getBytes(CHARSET);
+		byte[] both = new byte[original.length + nOnce.length];
+		System.arraycopy(original, 0, both, 0, original.length);
+		System.arraycopy(nOnce, 0, both, original.length, nOnce.length);
+		return both;
 	}
 	
 	/**
@@ -127,6 +202,16 @@ public class PublicPrivateEncryptor {
 	}
 	
 	/**
+	 * Generate a signed hash for byte array
+	 * @param data
+	 * @return the signed hash
+	 * @throws EncryptionException
+	 */
+	public byte[] signData(String data) throws EncryptionException{
+		return signData(data.getBytes(CHARSET));
+	}
+	
+	/**
 	 * Verify that given byte array matches the signed byte array
 	 * @param data the raw data
 	 * @param sigBytes The signature of the raw data
@@ -166,6 +251,28 @@ public class PublicPrivateEncryptor {
 	}
 	
 	/**
+	 * Encrypt a byte array with the public key and add an NOnce
+	 * @param bytesToEncrypt the byte array to decrypt
+	 * @param nBytesNOnce number of bytes for NOnce to add
+	 * @return The resultant byte array
+	 * @throws EncryptionException
+	 */
+	public byte[] encryptWithPublic(byte[] bytesToEncrypt, int nBytesNOnce) throws EncryptionException{
+		// append nBytesNOnce to bytes
+		byte[] both = appendNOnceToByteArray(bytesToEncrypt, nBytesNOnce);
+		
+		// now encrypt
+		Cipher cipher = cipherStorePublic.getEncryptCipher();
+		try {
+			return cipher.doFinal(both);
+		} catch (IllegalBlockSizeException e) {
+			throw new EncryptionException(e);
+		} catch (BadPaddingException e) {
+			throw new EncryptionException(e);
+		}
+	}
+
+	/**
 	 * Decypt a byte array with the private key
 	 * @param bytesToEncrypt the byte array to decrypt
 	 * @return The resultant byte array
@@ -181,6 +288,29 @@ public class PublicPrivateEncryptor {
 		} catch (BadPaddingException e) {
 			throw new EncryptionException(e);
 		}
+	}
+	
+	/**
+	 * Decypt a byte array with the private key
+	 * @param bytesToEncrypt the byte array to decrypt
+	 * @return The resultant byte array
+	 * @throws EncryptionException
+	 */
+	public byte[] decryptWithPrivate(byte[] bytesToDecrypt, int nBytesNOnce) throws EncryptionException{
+		Cipher cipher = cipherStorePrivate.getDecryptCipher();
+		
+		// decrypt
+		byte[] decrypted;
+		try {
+			decrypted = cipher.doFinal(bytesToDecrypt);
+		} catch (IllegalBlockSizeException e) {
+			throw new EncryptionException(e);
+		} catch (BadPaddingException e) {
+			throw new EncryptionException(e);
+		}
+		
+		// strip nOnce off the end
+		return Arrays.copyOfRange(decrypted, 0, decrypted.length-nBytesNOnce);
 	}
 	
 	/**

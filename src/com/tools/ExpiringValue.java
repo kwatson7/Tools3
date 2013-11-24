@@ -15,6 +15,7 @@ public class ExpiringValue <VALUE_TYPE> {
 	private float secondsToExpire;
 	private VALUE_TYPE currentValue;
 	private VALUE_TYPE defaultValue;
+	private boolean refreshOnGetAlso;
 	private long lastUpdateTime = 0;
 	
 	/**
@@ -24,9 +25,10 @@ public class ExpiringValue <VALUE_TYPE> {
 	 * @param defaultValue The default value when timer expires
 	 * @param <VALUE_TYPE> The type of value to store
 	 */
-	public ExpiringValue(float secondsToExpire, VALUE_TYPE currentValue, VALUE_TYPE defaultValue){
+	public ExpiringValue(float secondsToExpire, VALUE_TYPE currentValue, VALUE_TYPE defaultValue, boolean refreshOnGetAlso){
 		this.secondsToExpire = secondsToExpire;
 		this.defaultValue = defaultValue;
+		this.refreshOnGetAlso = refreshOnGetAlso;
 		setValue(currentValue);
 	}
 	
@@ -46,10 +48,16 @@ public class ExpiringValue <VALUE_TYPE> {
 	public VALUE_TYPE getValue(){
 		Date date = new Date();
 		long currentTime = date.getTime();
-		if (currentTime - lastUpdateTime > secondsToExpire*1000)
+		if (currentTime - lastUpdateTime > secondsToExpire*1000){
+			currentValue = defaultValue;
+			if (refreshOnGetAlso)
+				updateTime();
 			return defaultValue;
-		else
+		}else{
+			if (refreshOnGetAlso)
+				updateTime();
 			return currentValue;
+		}
 	}
 	
 	/**

@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.InputType;
 import android.widget.EditText;
 
 /**
@@ -20,6 +21,7 @@ extends Activity {
 	public static final String TITLE_BUNDLE = "title";
 	public static final String DEFAULT_TEXT = "defaultText";
 	public static final String RESULT = "result";
+	public static final String INPUT_TYPE = "INPUT_TYPE";
 	
 	/** Called when the activity is first created. */
 	@Override
@@ -42,6 +44,10 @@ extends Activity {
 		// create dialog and edit text
 		final AlertDialog.Builder alert = new AlertDialog.Builder(this);
 		final EditText input = new EditText(this);
+		
+		// set text input type if present in bundle
+		if (extras!=null && extras.containsKey(INPUT_TYPE))
+			input.setInputType(extras.getInt(INPUT_TYPE));
 		
 		// set title
 		if (title != null){alert.setMessage(title);}

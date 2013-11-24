@@ -11,10 +11,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
-import javax.crypto.IllegalBlockSizeException;
 
 public class SymmetricEncryptor {
 
@@ -64,6 +62,15 @@ public class SymmetricEncryptor {
 	 * @param key
 	 */
 	public SymmetricEncryptor(byte[] key) {
+		cipherStore = new CipherStore(key, ALGORITHM_NAME_ENCRYPT);
+	}
+	
+	/**
+	 * Generate an encryptor with the given key
+	 * @param key
+	 */
+	public SymmetricEncryptor(char[] keyChar) {
+		byte[] key = (new String(keyChar)).getBytes(CHARSET);
 		cipherStore = new CipherStore(key, ALGORITHM_NAME_ENCRYPT);
 	}
 
@@ -118,6 +125,41 @@ public class SymmetricEncryptor {
 	}
 	
 	/**
+	 * Encrypt a file
+	 * @param byteArray The original data to encrypt to file
+	 * @param fileNameOutput The output file
+	 * @throws IOException
+	 * @throws EncryptionException 
+	 */
+	public void encryptByteArrayToFile(byte[] byteArray, String fileNameOutput)
+			throws IOException, EncryptionException{
+
+		// Here you read the cleartext.
+		ByteArrayInputStream fis = new ByteArrayInputStream(byteArray);
+
+		// This stream write the encrypted text. This stream will be wrapped by another stream.
+		FileOutputStream fos = new FileOutputStream(fileNameOutput);
+
+		// Wrap the output stream and write bytes
+		CipherOutputStream cos = new CipherOutputStream(fos, cipherStore.getEncryptCipher());
+
+		// first write hashed password
+		cos.write(cipherStore.getKeyCode());
+
+		// write rest of file
+		int b;
+		byte[] d = new byte[8];
+		while((b = fis.read(d)) != -1) {
+			cos.write(d, 0, b);
+		}
+
+		// Flush and close streams.
+		cos.flush();
+		cos.close();
+		fis.close();
+	}
+	
+	/**
 	 * Write a string to file encrypted
 	 * @param stringToEncrypt The string to encrypt
 	 * @param fileNameOutput The filename to write to
@@ -168,10 +210,16 @@ public class SymmetricEncryptor {
 	    // first read password hash and check that it matches
 	    byte[] passwordCheck = new byte[cipherStore.getKeyCode().length];
 	    int check = cis.read(passwordCheck);
-	    if (check == -1)
+	    if (check == -1){
+	    	cis.close();
+	    	fos.close();
 	    	throw new IncorrectPasswordException();
-	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck))
+	    }
+	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck)){
+	    	fos.close();
+	    	cis.close();
 	    	throw new IncorrectPasswordException();
+	    }
 	    
 	    // read the data and write to output file
 	    int b;
@@ -190,6 +238,57 @@ public class SymmetricEncryptor {
 	    	if (!success)
 	    		throw new IOException(ENCRYPTED_FILE_NOT_DELETED);
 	    }
+	}
+	
+	/**
+	 * Decrypt a file and write to byte array
+	 * @param fileNameInput The original encrypted file
+	 * @param isKeepOldFile boolean to keep old encrypted file (true) or delete (false)
+	 * @throws IOException
+	 * @throws IncorrectPasswordException 
+	 * @throws EncryptionException 
+	 */
+	public byte[] decryptFileToByteArray(String fileNameInput, boolean isKeepOldFile)
+			throws IOException, IncorrectPasswordException, EncryptionException {
+		
+		// open original file
+	    FileInputStream fis = new FileInputStream(fileNameInput);
+
+	    // open output stream
+	    ByteArrayOutputStream output = new ByteArrayOutputStream();	
+
+	    // create the cipher input stream
+	    CipherInputStream cis = new CipherInputStream(fis, cipherStore.getDecryptCipher());
+
+	    // first read password hash and check that it matches
+	    byte[] passwordCheck = new byte[cipherStore.getKeyCode().length];
+	    int check = cis.read(passwordCheck);
+	    if (check == -1){
+	    	cis.close();
+	    	throw new IncorrectPasswordException();
+	    }
+	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck)){
+	    	cis.close();
+	    	throw new IncorrectPasswordException();
+	    }
+	    
+	    // read the data and write to output file
+	    int b;
+	    byte[] d = new byte[8];
+	    while((b = cis.read(d)) != -1) {
+	    	output.write(d, 0, b);
+	    }
+	    cis.close();
+	    
+	    // delete the old file if desired
+	    if (!isKeepOldFile){
+	    	File file = new File(fileNameInput);
+	    	boolean success = file.delete();
+	    	if (!success)
+	    		throw new IOException(ENCRYPTED_FILE_NOT_DELETED);
+	    }
+	    
+	    return output.toByteArray();
 	}
 	
 	/**
@@ -215,10 +314,14 @@ public class SymmetricEncryptor {
 	    // first read password hash and check that it matchs
 	    byte[] passwordCheck = new byte[cipherStore.getKeyCode().length];
 	    int check = cis.read(passwordCheck);
-	    if (check == -1)
+	    if (check == -1){
+	    	cis.close();
 	    	throw new IncorrectPasswordException();
-	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck))
+	    }
+	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck)){
+	    	cis.close();
 	    	throw new IncorrectPasswordException();
+	    }
 	    
 	    // read data
 	    byte[] buffer = new byte[1024];
@@ -281,10 +384,14 @@ public class SymmetricEncryptor {
 	    // first read password hash and check that it matchs
 	    byte[] passwordCheck = new byte[cipherStore.getKeyCode().length];
 	    int check = cis.read(passwordCheck);
-	    if (check == -1)
+	    if (check == -1){
+	    	cis.close();
 	    	throw new IncorrectPasswordException();
-	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck))
+	    }
+	    if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck)){
+	    	cis.close();
 	    	throw new IncorrectPasswordException();
+	    }
 	    
 	    // read data
 	    byte[] buffer = new byte[256];

@@ -101,6 +101,7 @@ public class Tools {
 	public static final int BUFFER_SIZE = 1024;
 
 	private static final String LOG_TAG = "Tools";
+	private static final char[] ILLEGAL_CHARACTERS = { '/', '\n', '\r', '\t', '\0', '\f', '`', '?', '*', '\\', '<', '>', '|', '\"', ':'};
 
 	/**
 	 * Get a filename from a given uri
@@ -638,6 +639,136 @@ public class Tools {
 				output += new BigDecimal(seconds).stripTrailingZeros().toPlainString()  + " seconds, ";
 		}
 
+		// return the string minus the last comma and space
+		if (output.length() >= 2)
+			return output.substring(0, output.length()-2);		
+		else
+			return output;
+	}
+	
+	/**
+	 * Take in an amount of milliseconds and convert it to a human readable output.
+	 * For example, if minutes=384, then the output will be:
+	 * "6 hours and 24 minutes".
+	 * <p></p>
+	 * The allowable outputs are years (365 days), weeks, days, hours, minutes, seconds
+	 * <p></p>
+	 * If milliseconds is 70000 and minFractionToShowNextCategory is 0.25, that means we
+	 * currently have 70 seconds to display, which will format to 1 minute and 10 seconds... however
+	 * since the last category (10 seconds) only adds 1/6th or 0.16 extra information to 1 minute
+	 * and the min threshold input is 0.25 only "1 minute" will be displayed. The input time
+	 * would have to be 75000 before the (now 15 seconds) would be displayed 
+	 * @param milliseconds the milliseconds to convert
+	 * @param minFractionToShowNextCategory Minimum amount of extra info needed to show next category.
+	 * @return the human readable string
+	 */
+	public static String convertMillisecondsToFormattedString(double milliseconds, double minFractionToShowNextCategory){
+
+		// if 0 then return 0 seconds
+		if (milliseconds == 0)
+			return "0 seconds";
+
+		// the output string
+		String output = "";
+		
+		// if negative then change string
+		if (milliseconds < 0){
+			milliseconds = -milliseconds;
+			output = "- ";
+		}
+
+		// convert milliseconds to minutes
+		double minutes = milliseconds/60000;
+		
+		// keep track of base amount to know when to stop adding new info
+		double baseMinutes = 0;
+		
+		// find how many years
+		int years = (int) Math.floor(minutes/(365*60*24));
+		if (years > 0){
+			if (years == 1)
+				output = years + " year, ";
+			else
+				output = years + " years, ";
+			baseMinutes = (years*365*60*24);
+			minutes = minutes - baseMinutes;
+		}
+
+		// how many weeks
+		int weeks = (int) Math.floor(minutes/(60*24*7));
+		if (weeks > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (weeks == 1)
+				output += weeks + " week, ";
+			else
+				output += weeks + " weeks, ";
+			minutes = minutes - (weeks*60*24*7);
+			if (baseMinutes == 0)
+				baseMinutes = weeks*60*24*7;
+		}
+
+		// how many days
+		int days = (int) Math.floor(minutes/(60*24));
+		if (days > 0  && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (days == 1)
+				output += days + " day, ";
+			else
+				output += days + " days, ";
+			minutes = minutes - (days*60*24);
+			if (baseMinutes == 0)
+				baseMinutes = days*60*24;
+		}
+
+		// how many hours
+		int hours = (int) Math.floor(minutes/(60));
+		if (hours > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (hours == 1)
+				output += hours + " hour, ";
+			else
+				output += hours + " hours, ";
+			minutes = minutes - (hours*60);
+			if (baseMinutes == 0)
+				baseMinutes = hours*60;
+		}
+
+		// how many minutes
+		int minutesDisp = (int) Math.floor(minutes);
+		if (minutesDisp > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			if (minutesDisp == 1)
+				output += minutesDisp + " minute, ";
+			else
+				output += minutesDisp + " minutes, ";
+			minutes = minutes - (minutesDisp);
+			if (baseMinutes == 0)
+				baseMinutes = minutesDisp;
+		}
+
+		// how many seconds
+		double seconds =  minutes*60.0;
+		if (seconds > 0 && (baseMinutes == 0 || minutes/baseMinutes >= minFractionToShowNextCategory)){
+			// then only go out to decimal that still meets minFraction
+			double secondsToDisplay = 0;
+			int maxDecimal = -1;
+			for (int decimal = -1; decimal < 6; decimal++){
+				if (baseMinutes != 0){
+					if (Math.abs(seconds-secondsToDisplay) > baseMinutes*minFractionToShowNextCategory){
+						secondsToDisplay += com.tools.MathTools.round(seconds-secondsToDisplay, decimal);
+						maxDecimal = decimal;
+					}
+				}else{
+					secondsToDisplay += com.tools.MathTools.round(seconds-secondsToDisplay, decimal);
+					baseMinutes = secondsToDisplay/60;
+					maxDecimal = decimal;
+				}
+			}
+
+			if (secondsToDisplay == 1)
+				output += new BigDecimal(secondsToDisplay).setScale(
+						maxDecimal, BigDecimal.ROUND_HALF_UP).toPlainString() + " second, ";
+			else
+				output += new BigDecimal(secondsToDisplay).setScale(
+						maxDecimal, BigDecimal.ROUND_HALF_UP).toPlainString()  + " seconds, ";
+		}
+		
 		// return the string minus the last comma and space
 		if (output.length() >= 2)
 			return output.substring(0, output.length()-2);		
@@ -1386,7 +1517,7 @@ public class Tools {
 			// failsafe toast
 			if (ctx != null){
 				try{
-					Toast.makeText(ctx, message, Toast.LENGTH_LONG);
+					Toast.makeText(ctx, message, Toast.LENGTH_LONG).show();
 				}catch(Exception e2){
 					Log.e(LOG_TAG, Log.getStackTraceString(e2));
 				}
@@ -1587,6 +1718,30 @@ public class Tools {
 	}
 	
 	/**
+	 * Get the time required to read for a toast message, based on number of words. Maxes out at 10 seconds
+	 * @param message The message to parse
+	 * @return Time in milliseconds to show toast
+	 */
+	public static long getTimeToReadForToast(String message){
+		// some constants for timeing
+		final double wordsPerSecond = 3.3;
+		final double maxTime = 10;
+		final double initialTime = 1.5;
+		
+		// count the words
+		String trim = message.trim();
+		if (trim.isEmpty()) return 0;
+		int nWords = trim.split("\\s+").length; //separate string around spaces
+		
+		// convert to time
+		double time = nWords/wordsPerSecond + initialTime;
+		if (time > maxTime)
+			time = maxTime;
+		
+		return (long) (time*1000);
+	}
+	
+	/**
 	 * Return the device manufacturer and model
 	 * @return
 	 */
@@ -1671,5 +1826,36 @@ public class Tools {
 		byte[] a = md5CheckSumFile(fileName1);
 		byte[] b = md5CheckSumFile(fileName2);
 		return Arrays.equals(a, b);
+	}
+	
+	/**
+	 * takes a name and returns an allowable file/directory name. It replaces all non acceptable characters
+	 * with _. ie file:name returns file_name
+	 * @param name input name
+	 * @return The acceptible file name
+	 */
+	public static String getAllowableFileName(String name){
+
+		String out = name;
+		for (int i = 0; i < ILLEGAL_CHARACTERS.length; i++)
+			out = out.replace(ILLEGAL_CHARACTERS[i], '_');
+
+		return out.trim();
+	}
+	
+
+	/**
+	 * Make the string plural if number is != 1. For example if number is 2, and noun is cat, then "2 cats" will be the output
+	 * @param number the number
+	 * @param noun the noun to convert
+	 * @return The number with the noun
+	 */
+	public static String pluralString(double number, String noun){
+		String out;
+		if (number== 1)
+			out = number+" "+ noun;
+		else
+			out = number+" "+ noun+"s";
+		return out;
 	}
 }
