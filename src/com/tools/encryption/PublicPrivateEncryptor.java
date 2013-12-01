@@ -129,9 +129,13 @@ public class PublicPrivateEncryptor {
 	/**
 	 * Return the private key
 	 * @return
+	 * @throws EncryptionException if no private key available
 	 */
-	public PrivateKey getPrivate(){
-		return privateKey;
+	public PrivateKey getPrivate() throws EncryptionException{
+		if (privateKey == null)
+			throw new EncryptionException("No Private Key");
+		else
+			return privateKey;
 	}
 	
 	/**
