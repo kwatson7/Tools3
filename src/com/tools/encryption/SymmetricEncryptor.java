@@ -14,6 +14,8 @@ import java.util.Arrays;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 
+import android.util.Base64;
+
 public class SymmetricEncryptor {
 
 	// public constants
@@ -68,11 +70,17 @@ public class SymmetricEncryptor {
 	/**
 	 * Generate an encryptor with the given key
 	 * @param key
+	 * @throws EncryptionException 
 	 */
-	public SymmetricEncryptor(char[] keyChar) {
-		byte[] key = (new String(keyChar)).getBytes(CHARSET);
-		cipherStore = new CipherStore(key, ALGORITHM_NAME_ENCRYPT);
+	public SymmetricEncryptor(char[] keyChar) throws EncryptionException {
+		this(new String(keyChar));
+		//byte[] key = (new String(keyChar)).getBytes(CHARSET);
+		//cipherStore = new CipherStore(key, ALGORITHM_NAME_ENCRYPT);
 	}
+	
+//	public static byte[] convertToValidKey(char[] keyChar){
+//		
+//	}
 
 	// public methods
 	public byte[] getKeyCode(){
@@ -122,68 +130,6 @@ public class SymmetricEncryptor {
 			if (!success)
 				throw new ClearTextFileNotDeletedException();
 		}
-	}
-	
-	/**
-	 * Encrypt a file
-	 * @param byteArray The original data to encrypt to file
-	 * @param fileNameOutput The output file
-	 * @throws IOException
-	 * @throws EncryptionException 
-	 */
-	public void encryptByteArrayToFile(byte[] byteArray, String fileNameOutput)
-			throws IOException, EncryptionException{
-
-		// Here you read the cleartext.
-		ByteArrayInputStream fis = new ByteArrayInputStream(byteArray);
-
-		// This stream write the encrypted text. This stream will be wrapped by another stream.
-		FileOutputStream fos = new FileOutputStream(fileNameOutput);
-
-		// Wrap the output stream and write bytes
-		CipherOutputStream cos = new CipherOutputStream(fos, cipherStore.getEncryptCipher());
-
-		// first write hashed password
-		cos.write(cipherStore.getKeyCode());
-
-		// write rest of file
-		int b;
-		byte[] d = new byte[8];
-		while((b = fis.read(d)) != -1) {
-			cos.write(d, 0, b);
-		}
-
-		// Flush and close streams.
-		cos.flush();
-		cos.close();
-		fis.close();
-	}
-	
-	/**
-	 * Write a string to file encrypted
-	 * @param stringToEncrypt The string to encrypt
-	 * @param fileNameOutput The filename to write to
-	 * @throws IOException
-	 * @throws EncryptionException 
-	 */
-	public void encryptStringToFile(String stringToEncrypt, String fileNameOutput)
-			throws IOException, EncryptionException{
-		
-		// This stream write the encrypted text. This stream will be wrapped by another stream.
-		FileOutputStream fos = new FileOutputStream(fileNameOutput);
-		
-		// Wrap the output stream and write bytes
-		CipherOutputStream cos = new CipherOutputStream(fos, cipherStore.getEncryptCipher());
-
-		// first write hashed password
-		cos.write(cipherStore.getKeyCode());
-		
-		// write string
-		cos.write(stringToEncrypt.getBytes(CHARSET));
-
-		// Flush and close streams.
-		cos.flush();
-		cos.close();
 	}
 	
 	/**
@@ -241,6 +187,41 @@ public class SymmetricEncryptor {
 	}
 	
 	/**
+	 * Encrypt a file
+	 * @param byteArray The original data to encrypt to file
+	 * @param fileNameOutput The output file
+	 * @throws IOException
+	 * @throws EncryptionException 
+	 */
+	public void encryptByteArrayToFile(byte[] byteArray, String fileNameOutput)
+			throws IOException, EncryptionException{
+
+		// Here you read the cleartext.
+		ByteArrayInputStream fis = new ByteArrayInputStream(byteArray);
+
+		// This stream write the encrypted text. This stream will be wrapped by another stream.
+		FileOutputStream fos = new FileOutputStream(fileNameOutput);
+
+		// Wrap the output stream and write bytes
+		CipherOutputStream cos = new CipherOutputStream(fos, cipherStore.getEncryptCipher());
+
+		// first write hashed password
+		cos.write(cipherStore.getKeyCode());
+
+		// write rest of file
+		int b;
+		byte[] d = new byte[8];
+		while((b = fis.read(d)) != -1) {
+			cos.write(d, 0, b);
+		}
+
+		// Flush and close streams.
+		cos.flush();
+		cos.close();
+		fis.close();
+	}
+	
+	/**
 	 * Decrypt a file and write to byte array
 	 * @param fileNameInput The original encrypted file
 	 * @param isKeepOldFile boolean to keep old encrypted file (true) or delete (false)
@@ -289,6 +270,160 @@ public class SymmetricEncryptor {
 	    }
 	    
 	    return output.toByteArray();
+	}
+	
+	/**
+	 * Encrypt a byte array to another byte array
+	 * @param byteArray The original data to encrypt
+	 * @throws IOException 
+	 * @throws EncryptionException 
+	 */
+	public byte[] encryptByteArrayToByteArray(byte[] byteArray)
+			throws IOException, EncryptionException{
+
+		// Here you read the cleartext.
+		ByteArrayInputStream fis = new ByteArrayInputStream(byteArray);
+
+		// This stream write the encrypted data. This stream will be wrapped by another stream.
+		ByteArrayOutputStream output = new ByteArrayOutputStream(byteArray.length);
+
+		// Wrap the output stream and write bytes
+		CipherOutputStream cos = new CipherOutputStream(output, cipherStore.getEncryptCipher());
+
+		// first write hashed password
+		cos.write(cipherStore.getKeyCode());
+
+		// write rest of byte array
+		int b;
+		byte[] d = new byte[8];
+		while((b = fis.read(d)) != -1) {
+			cos.write(d, 0, b);
+		}
+
+		// Flush and close streams.
+		cos.flush();
+		cos.close();
+		fis.close();
+		
+		return output.toByteArray();	
+	}
+	
+	/**
+	 * Decrypt a byte array to another byte array
+	 * @param byteArray The original data to encrypt
+	 * @throws IOException 
+	 * @throws EncryptionException 
+	 * @throws IncorrectPasswordException 
+	 */
+	public byte[] decryptByteArrayToByteArray(byte[] byteArrayToDecrypt)
+			throws IOException, EncryptionException, IncorrectPasswordException{	    
+
+		// open input byteArray
+		ByteArrayInputStream bis = new ByteArrayInputStream(byteArrayToDecrypt);
+
+		// open output stream
+		ByteArrayOutputStream output = new ByteArrayOutputStream();	
+
+		// create the cipher input stream
+		CipherInputStream cis = new CipherInputStream(bis, cipherStore.getDecryptCipher());
+
+		// first read password hash and check that it matchs
+		byte[] passwordCheck = new byte[cipherStore.getKeyCode().length];
+		int check = cis.read(passwordCheck);
+		if (check == -1){
+			cis.close();
+			throw new IncorrectPasswordException();
+		}
+		if (!Arrays.equals(cipherStore.getKeyCode(), passwordCheck)){
+			cis.close();
+			throw new IncorrectPasswordException();
+		}
+
+		// read the data and write to output file
+		int b;
+		byte[] d = new byte[8];
+		while((b = cis.read(d)) != -1) {
+			output.write(d, 0, b);
+		}
+		cis.close();
+
+		return output.toByteArray();
+	}
+	
+	/**
+	 * Encrypt a byte array to a base64 string
+	 * @param byteArray The original data to encrypt
+	 * @throws IOException 
+	 * @throws EncryptionException 
+	 */
+	public String encryptByteArrayToBase64String(byte[] byteArray) throws IOException, EncryptionException{
+		byte[] byteArrayOut = encryptByteArrayToByteArray(byteArray);
+		return Base64.encodeToString(byteArrayOut, Base64.DEFAULT);		
+	}
+	
+	/**
+	 * Decrypt a base64 string to a byte array
+	 * @param strintToDecrypt 
+	 * @return the clear text byte array
+	 * @throws IOException
+	 * @throws EncryptionException
+	 * @throws IncorrectPasswordException
+	 */
+	public byte[] decryptBase64StringToByteArray(String strintToDecrypt) throws IOException, EncryptionException, IncorrectPasswordException{
+		byte[] byteArray = Base64.decode(strintToDecrypt, Base64.DEFAULT);
+		return decryptByteArrayToByteArray(byteArray);
+	}
+	
+	/**
+	 * Encrypt a string to a base64 string
+	 * @param input The original data to encrypt
+	 * @throws IOException 
+	 * @throws EncryptionException 
+	 */
+	public String encryptStringToBase64String(String input) throws IOException, EncryptionException{
+		byte[] byteArrayOut = encryptStringToByteArray(input);
+		return Base64.encodeToString(byteArrayOut, Base64.DEFAULT);	
+	}
+	
+	/**
+	 * Decrypt a base64 string and output a string
+	 * @param input the string to decrypt
+	 * @return the clear text string
+	 * @throws IOException
+	 * @throws EncryptionException
+	 * @throws IncorrectPasswordException
+	 */
+	public String decryptBase64StringToString(String input) throws IOException, EncryptionException, IncorrectPasswordException{
+		// decode base64 to byte
+		byte[] byteArray = Base64.decode(input, Base64.DEFAULT);
+		return decryptByteArrayToString(byteArray);
+	}
+
+	/**
+	 * Write a string to file encrypted
+	 * @param stringToEncrypt The string to encrypt
+	 * @param fileNameOutput The filename to write to
+	 * @throws IOException
+	 * @throws EncryptionException 
+	 */
+	public void encryptStringToFile(String stringToEncrypt, String fileNameOutput)
+			throws IOException, EncryptionException{
+		
+		// This stream write the encrypted text. This stream will be wrapped by another stream.
+		FileOutputStream fos = new FileOutputStream(fileNameOutput);
+		
+		// Wrap the output stream and write bytes
+		CipherOutputStream cos = new CipherOutputStream(fos, cipherStore.getEncryptCipher());
+
+		// first write hashed password
+		cos.write(cipherStore.getKeyCode());
+		
+		// write string
+		cos.write(stringToEncrypt.getBytes(CHARSET));
+
+		// Flush and close streams.
+		cos.flush();
+		cos.close();
 	}
 	
 	/**
