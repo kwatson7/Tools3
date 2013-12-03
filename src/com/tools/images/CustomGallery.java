@@ -94,6 +94,7 @@ extends Gallery{
 					setSelection(pos-1);
 					return true;
 				}
+				break;
 	
 			case KeyEvent.KEYCODE_DPAD_RIGHT:
 				if (pos < this.getAdapter().getCount()-1){
